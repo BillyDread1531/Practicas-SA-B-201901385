@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login exitoso</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg1: #07111f;
+        --bg2: #13263d;
+        --accent: #6ee7f9;
+        --accent-strong: #3b82f6;
+        --text: #f8fafc;
+        --muted: #dbeafe;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family: 'Inter', sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(110,231,249,0.25), transparent 30%),
+          radial-gradient(circle at bottom right, rgba(59,130,246,0.22), transparent 24%),
+          linear-gradient(135deg, var(--bg1), var(--bg2));
+        padding: 1.2rem;
+      }
+
+      .card {
+        background: linear-gradient(145deg, rgba(255,255,255,0.14), rgba(255,255,255,0.06));
+        backdrop-filter: blur(18px);
+        border: 1px solid rgba(255,255,255,0.16);
+        color: var(--text);
+        padding: 2rem;
+        border-radius: 24px;
+        width: min(92%, 520px);
+        box-shadow: 0 20px 45px rgba(0,0,0,0.35);
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .card::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg, rgba(110,231,249,0.12), transparent 42%, rgba(255,255,255,0.06));
+        pointer-events: none;
+      }
+
+      .header {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.85rem;
+        margin-bottom: 1rem;
+      }
+
+      .icon {
+        width: 58px;
+        height: 58px;
+        border-radius: 18px;
+        display: grid;
+        place-items: center;
+        font-size: 2rem;
+        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+        color: #05111b;
+        box-shadow: 0 12px 28px rgba(59,130,246,0.3);
+      }
+
+      .header-text h1 {
+        margin: 0;
+        font-family: 'Playfair Display', serif;
+        font-size: 1.9rem;
+      }
+
+      .header-text p {
+        margin: 0.3rem 0 0;
+        color: var(--muted);
+      }
+
+      .role-pill {
+        position: relative;
+        z-index: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0.25rem auto 0;
+        padding: 0.45rem 0.85rem;
+        border-radius: 999px;
+        background: rgba(110,231,249,0.12);
+        border: 1px solid rgba(110,231,249,0.25);
+        color: #dffcff;
+        font-size: 0.85rem;
+        font-weight: 700;
+      }
+
+      .role-card {
+        position: relative;
+        z-index: 1;
+        margin-top: 1rem;
+        padding: 1rem;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.12);
+      }
+
+      .role-card h2 {
+        margin: 0 0 0.35rem;
+        font-size: 1rem;
+      }
+
+      .role-card ul {
+        margin: 0.7rem 0 0;
+        padding-left: 1.15rem;
+        color: var(--muted);
+        line-height: 1.7;
+        text-align: left;
+      }
+
+      .role-card p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .note {
+        position: relative;
+        z-index: 1;
+        color: var(--muted);
+        line-height: 1.7;
+        margin: 0.25rem 0 0;
+      }
+
+      .actions {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        justify-content: center;
+        gap: 0.8rem;
+        margin-top: 1.3rem;
+        flex-wrap: wrap;
+      }
+
+      button {
+        flex: 1;
+        min-width: 180px;
+        margin-top: 0;
+        padding: 0.95rem 1rem;
+        border: none;
+        border-radius: 999px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+        color: #05111b;
+        font-weight: 800;
+        cursor: pointer;
+        box-shadow: 0 10px 22px rgba(59,130,246,0.25);
+      }
+
+      .ghost {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid var(--border);
+        box-shadow: none;
+      }
+
+      @media (max-width: 720px) {
+        .card {
+          padding: 1.4rem;
+        }
+
+        .header-text h1 {
+          font-size: 1.55rem;
+        }
+
+        .actions {
+          flex-direction: column;
+        }
+
+        button {
+          min-width: 0;
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="header">
+        <div class="icon">✓</div>
+        <div class="header-text">
+          <h1>Login exitoso</h1>
+          <p>Tu sesión quedó lista.</p>
+        </div>
+      </div>
+
+      <div id="rolePill" class="role-pill">Cargando rol...</div>
+
+      <div id="roleCard" class="role-card" style="display:none"></div>
+
+      <p class="note">
+        Ya puedes seguir.
+      </p>
+
+      <div class="actions">
+        <button onclick="window.location.href='index.html'">Volver al inicio</button>
+        <button class="ghost" onclick="window.location.href='index.html'">Hacer otra prueba</button>
+      </div>
+    </div>
+
+    <script>
+      const rolePill = document.getElementById('rolePill');
+      const roleCard = document.getElementById('roleCard');
+      const params = new URLSearchParams(window.location.search);
+
+      async function loadRole() {
+        const roleFromUrl = params.get('role');
+        const storedRole = sessionStorage.getItem('authRole');
+        const role = roleFromUrl || storedRole;
+
+        if (role) {
+          renderRole(role);
+          return;
+        }
+
+        try {
+          const response = await fetch('http://localhost:3001/me', {
+            method: 'GET',
+            credentials: 'include',
+          });
+
+          if (!response.ok) {
+            rolePill.textContent = 'Usuario';
+            roleCard.style.display = 'block';
+            roleCard.innerHTML = '<h2>Contenido general</h2><p>Este espacio muestra lo que puede ver cada tipo de usuario cuando entra al sistema.</p>';
+            return;
+          }
+
+          const data = await response.json();
+          renderRole(data.user?.role || 'Usuario');
+        } catch (error) {
+          rolePill.textContent = 'No se pudo leer la sesión';
+          roleCard.style.display = 'block';
+          roleCard.innerHTML = '<h2>Error</h2><p>La pantalla sí está hablando con el backend, pero no pudo leer el usuario.</p>';
+          actionsGrid.style.display = 'grid';
+          actionsGrid.innerHTML = `
+            <a class="action-link" href="index.html">Volver al inicio</a>
+            <a class="action-link ghost" href="index.html">Reintentar</a>
+          `;
+        }
+      }
+
+      loadRole();
+
+      function renderRole(role) {
+        rolePill.textContent = `Sesión de ${role}`;
+        roleCard.style.display = 'block';
+
+        if (role === 'Admin') {
+          roleCard.innerHTML = `
+            <h2>Modo administrador</h2>
+            <p>El admin ve todo esto:</p>
+            <ul>
+              <li>Registro y login</li>
+              <li>Ruta <strong>/admin-only</strong></li>
+              <li>Ruta <strong>/dashboard</strong></li>
+            </ul>
+          `;
+        } else {
+          roleCard.innerHTML = `
+            <h2>Modo cliente</h2>
+            <p>El cliente ve esto:</p>
+            <ul>
+              <li>Registro y login</li>
+              <li>Ruta <strong>/dashboard</strong></li>
+              <li>La ruta <strong>/admin-only</strong> le da 403</li>
+            </ul>
+          `;
+        }
+      }
+    </script>
+  </body>
+</html>

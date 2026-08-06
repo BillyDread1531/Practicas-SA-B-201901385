@@ -42,7 +42,7 @@ P1/
    ```bash
    npm install
    ```
-2. Configurar el archivo `.env` en la raíz (usar `.env.example` como base):
+2. Configurar el archivo `.env` en la raíz:
    ```dotenv
    PORT=3000
    DB_HOST=localhost
@@ -86,7 +86,7 @@ Cada solicitud operativa tiene los siguientes campos:
 
 ## Aplicación de los principios SOLID
 
-A continuación explico, con mis propias palabras, cómo apliqué cada uno de los cinco principios SOLID en este proyecto, con fragmentos de código reales como evidencia.
+Cómo apliqué cada uno de los cinco principios SOLID en este proyecto, con fragmentos de código reales como evidencia.
 
 ### 1. Principio de responsabilidad única (S - Single Responsibility)
 
@@ -116,7 +116,7 @@ const getAll = async (req, res) => {
 };
 ```
 
-Si mañana cambio una regla de validación, solo edito el service. Si cambio el motor de base de datos, solo edito el repository. Ningún cambio obliga a tocar las otras capas.
+Si cambio una regla de validación, solo edito el service. Si cambio el motor de base de datos, solo edito el repository. Ningún cambio obliga a tocar las otras capas.
 
 ### 2. Principio de abierto/cerrado (O - Open/Closed)
 
@@ -159,8 +159,6 @@ class NotFoundError extends Error {
   }
 }
 ```
-
-El `asyncHandler` que envuelve mis controladores no necesita saber si el error que capturó es un `ValidationError`, un `NotFoundError`, o cualquier otro: simplemente lo pasa con `next(err)`, confiando en que se comporta como cualquier `Error` de JavaScript. Puedo sustituir un tipo de error por otro sin que el resto del sistema se rompa.
 
 ### 4. Principio de segregación de interfaces (I - Interface Segregation)
 

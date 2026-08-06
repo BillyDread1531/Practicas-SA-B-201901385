@@ -1,0 +1,23 @@
+{
+  "name": "auth-service",
+  "version": "1.0.0",
+  "description": "Servicio principal de autenticación para la práctica 2",
+  "main": "src/app.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.1",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.1",
+    "pg": "^8.5.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.1"
+  }
+}

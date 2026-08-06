@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Práctica 2 - Auth</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg1: #07111f;
+        --bg2: #13263d;
+        --accent: #6ee7f9;
+        --accent-strong: #3b82f6;
+        --panel: rgba(255,255,255,0.08);
+        --panel-strong: rgba(255,255,255,0.16);
+        --text: #f8fafc;
+        --muted: #cbd5e1;
+        --border: rgba(255,255,255,0.16);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family: 'Inter', sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(110,231,249,0.25), transparent 30%),
+          linear-gradient(135deg, var(--bg1), var(--bg2));
+        padding: 1.2rem;
+      }
+
+      .card {
+        width: min(92%, 520px);
+        background: linear-gradient(145deg, rgba(255,255,255,0.12), rgba(255,255,255,0.05));
+        backdrop-filter: blur(18px);
+        border: 1px solid var(--border);
+        padding: 2rem;
+        border-radius: 24px;
+        box-shadow: 0 20px 45px rgba(0,0,0,0.35);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        margin-bottom: 1rem;
+      }
+
+      .brand-badge {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+        display: grid;
+        place-items: center;
+        font-weight: 800;
+        color: #08111d;
+      }
+
+      h1 {
+        margin: 0;
+        font-family: 'Playfair Display', serif;
+        font-size: 1.7rem;
+      }
+
+      .toggle {
+        display: flex;
+        gap: 0.6rem;
+        margin-bottom: 1rem;
+      }
+
+      .toggle button {
+        flex: 1;
+        padding: 0.8rem;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.08);
+        color: var(--text);
+        cursor: pointer;
+        font-weight: 600;
+        transition: 0.2s ease;
+      }
+
+      .toggle .active {
+        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+        color: #05111b;
+        box-shadow: 0 8px 20px rgba(62, 153, 246, 0.25);
+      }
+
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+
+      input {
+        width: 100%;
+        padding: 0.95rem 1rem;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.09);
+        color: var(--text);
+        outline: none;
+      }
+
+      input::placeholder { color: #9fb0c2; }
+
+      input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(110,231,249,0.2);
+      }
+
+      button {
+        width: 100%;
+        padding: 0.95rem 1rem;
+        border-radius: 12px;
+        border: none;
+        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+        color: #05111b;
+        font-weight: 800;
+        cursor: pointer;
+        box-shadow: 0 10px 22px rgba(59,130,246,0.25);
+      }
+
+      .message {
+        margin-top: 1rem;
+        padding: 0.85rem 1rem;
+        border-radius: 12px;
+        background: rgba(110,231,249,0.12);
+        color: #e8fdff;
+        border: 1px solid rgba(110,231,249,0.25);
+      }
+
+      @media (max-width: 600px) {
+        .card { padding: 1.4rem; }
+        h1 { font-size: 1.4rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="brand">
+        <div class="brand-badge">A</div>
+        <div>
+          <h1>Acceso</h1>
+        </div>
+      </div>
+      <div class="toggle">
+        <button id="showRegister" class="active" type="button">Registrar</button>
+        <button id="showLogin" type="button">Iniciar sesión</button>
+      </div>
+      <form id="authForm">
+        <input id="name" placeholder="Nombre" />
+        <input id="email" placeholder="Correo" />
+        <input id="password" type="password" placeholder="Contraseña" />
+        <button type="submit">Continuar</button>
+      </form>
+      <div id="message" class="message" style="display:none"></div>
+    </div>
+
+    <script>
+      const form = document.getElementById('authForm');
+      const message = document.getElementById('message');
+      const nameInput = document.getElementById('name');
+      const registerBtn = document.getElementById('showRegister');
+      const loginBtn = document.getElementById('showLogin');
+      let mode = 'register';
+
+      function setMode(nextMode) {
+        mode = nextMode;
+        registerBtn.classList.toggle('active', nextMode === 'register');
+        loginBtn.classList.toggle('active', nextMode === 'login');
+        nameInput.style.display = nextMode === 'register' ? 'block' : 'none';
+        form.querySelector('button').textContent = nextMode === 'register' ? 'Registrar' : 'Iniciar sesión';
+        message.style.display = 'none';
+        message.textContent = '';
+      }
+
+      registerBtn.addEventListener('click', () => setMode('register'));
+      loginBtn.addEventListener('click', () => setMode('login'));
+      setMode('register');
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+          name: document.getElementById('name').value,
+          email: document.getElementById('email').value,
+          password: document.getElementById('password').value,
+        };
+
+        try {
+          const endpoint = mode === 'register' ? 'http://localhost:3001/register' : 'http://localhost:3001/login';
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(mode === 'register' ? payload : { email: payload.email, password: payload.password }),
+          });
+
+          const data = await response.json();
+          message.textContent = data.message || 'Listo';
+          message.style.display = 'block';
+
+          if (mode === 'login' && response.ok) {
+            const role = data.role || 'Usuario';
+            sessionStorage.setItem('authRole', role);
+            message.textContent = `Entraste como ${role}`;
+            setTimeout(() => {
+              window.location.href = `success.html?role=${encodeURIComponent(role)}`;
+            }, 650);
+          }
+        } catch (err) {
+          message.textContent = 'Error al conectar con el backend';
+          message.style.display = 'block';
+        }
+      });
+    </script>
+  </body>
+</html>
