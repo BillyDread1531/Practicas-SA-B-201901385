@@ -1,0 +1,94 @@
+services:
+
+  postgres:
+    image: postgres:18
+    container_name: academia-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: academia
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    environment:
+      PORT: 3001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: academia
+      JWT_SECRET: clave_super_secreta_p4
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+
+  cursos-service:
+    build: ./cursos-service
+    container_name: cursos-service
+    environment:
+      PORT: 3002
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: academia
+    ports:
+      - "3002:3002"
+    depends_on:
+      - postgres
+
+  inscripciones-service:
+    build: ./inscripciones-service
+    container_name: inscripciones-service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: academia
+    ports:
+      - "3003:3003"
+    depends_on:
+      - postgres
+
+  estudiantes-service:
+    build: ./estudiantes-service
+    container_name: estudiantes-service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: academia
+    ports:
+      - "3004:3004"
+    depends_on:
+      - postgres
+
+  gateway:
+    build: ./gateway
+    container_name: api-gateway
+    environment:
+      PORT: 3000
+      AUTH_SERVICE: http://auth-service:3001
+      CURSOS_SERVICE: http://cursos-service:3002
+      INSCRIPCIONES_SERVICE: http://inscripciones-service:3003
+      ESTUDIANTES_SERVICE: http://estudiantes-service:3004
+      JWT_SECRET: clave_super_secreta_p4
+    ports:
+      - "3000:3000"
+    depends_on:
+      - auth-service
+      - cursos-service
+      - inscripciones-service
+      - estudiantes-service
+
+volumes:
+  postgres_data:
