@@ -1,0 +1,396 @@
+# ============================================================
+# SERVICE ACCOUNTS
+# ============================================================
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cron-insert-sa
+  namespace: {{ .Values.global.namespace }}
+automountServiceAccountToken: false
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cron-resumen-sa
+  namespace: {{ .Values.global.namespace }}
+automountServiceAccountToken: false
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cron-consumer-sa
+  namespace: {{ .Values.global.namespace }}
+automountServiceAccountToken: false
+
+---
+# ============================================================
+# RBAC MINIMO PARA CRONJOBS
+# ============================================================
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cronjobs-minimal-role
+  namespace: {{ .Values.global.namespace }}
+rules: []
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cron-insert-rolebinding
+  namespace: {{ .Values.global.namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: cron-insert-sa
+    namespace: {{ .Values.global.namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cronjobs-minimal-role
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cron-resumen-rolebinding
+  namespace: {{ .Values.global.namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: cron-resumen-sa
+    namespace: {{ .Values.global.namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cronjobs-minimal-role
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cron-consumer-rolebinding
+  namespace: {{ .Values.global.namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: cron-consumer-sa
+    namespace: {{ .Values.global.namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cronjobs-minimal-role
+
+---
+# ============================================================
+# CRONJOB 1
+# CADA 2 MINUTOS INSERTA REGISTRO
+# ============================================================
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cron-insert
+  namespace: {{ .Values.global.namespace }}
+
+spec:
+  schedule: "*/2 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: cron-insert
+
+        spec:
+          serviceAccountName: cron-insert-sa
+          automountServiceAccountToken: false
+          restartPolicy: Never
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            seccompProfile:
+              type: RuntimeDefault
+
+          containers:
+            - name: cron-insert
+              image: p5-cronjobs:1.0.0
+              imagePullPolicy: IfNotPresent
+
+              command:
+                - python
+                - /app/cron_insert.py
+
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 10001
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+
+              env:
+                - name: DB_HOST
+                  value: postgresql
+
+                - name: DB_PORT
+                  value: "5432"
+
+                - name: DB_NAME
+                  value: academia
+
+                - name: STUDENT_CARNET
+                  value: "201901385"
+
+              envFrom:
+                - secretRef:
+                    name: sa-platform-secrets
+
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 32Mi
+                limits:
+                  cpu: 100m
+                  memory: 96Mi
+
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# ============================================================
+# CRONJOB 2
+# CADA 10 MINUTOS GENERA RESUMEN Y PUBLICA A RABBITMQ
+# ============================================================
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cron-resumen
+  namespace: {{ .Values.global.namespace }}
+
+spec:
+  schedule: "*/10 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: cron-resumen
+
+        spec:
+          serviceAccountName: cron-resumen-sa
+          automountServiceAccountToken: false
+          restartPolicy: Never
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            seccompProfile:
+              type: RuntimeDefault
+
+          containers:
+            - name: cron-resumen
+              image: p5-cronjobs:1.0.0
+              imagePullPolicy: IfNotPresent
+
+              command:
+                - python
+                - /app/cron_resumen.py
+
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 10001
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+
+              env:
+                - name: DB_HOST
+                  value: postgresql
+
+                - name: DB_PORT
+                  value: "5432"
+
+                - name: DB_NAME
+                  value: academia
+
+                - name: RABBITMQ_HOST
+                  value: rabbitmq
+
+                - name: RABBITMQ_PORT
+                  value: "5672"
+
+                - name: CRON_QUEUE
+                  value: cron.resumenes
+
+              envFrom:
+                - secretRef:
+                    name: sa-platform-secrets
+
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 32Mi
+                limits:
+                  cpu: 100m
+                  memory: 96Mi
+
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# ============================================================
+# CONSUMIDOR DEL RESUMEN
+# ============================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cron-resumen-consumer
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: cron-resumen-consumer
+
+spec:
+  replicas: 1
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cron-resumen-consumer
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cron-resumen-consumer
+
+    spec:
+      serviceAccountName: cron-consumer-sa
+      automountServiceAccountToken: false
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+        - name: consumer
+          image: p5-cronjobs:1.0.0
+          imagePullPolicy: IfNotPresent
+
+          command:
+            - python
+            - /app/cron_consumer.py
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+          env:
+            - name: DB_HOST
+              value: postgresql
+
+            - name: DB_PORT
+              value: "5432"
+
+            - name: DB_NAME
+              value: academia
+
+            - name: RABBITMQ_HOST
+              value: rabbitmq
+
+            - name: RABBITMQ_PORT
+              value: "5672"
+
+            - name: CRON_QUEUE
+              value: cron.resumenes
+
+          envFrom:
+            - secretRef:
+                name: sa-platform-secrets
+
+          startupProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import socket; s=socket.create_connection(('rabbitmq',5672),2); s.close()"
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 12
+
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import socket; r=socket.create_connection(('rabbitmq',5672),2); r.close(); p=socket.create_connection(('postgresql',5432),2); p.close()"
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "kill -0 1"
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 96Mi
+
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: tmp
+          emptyDir: {}

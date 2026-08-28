@@ -1,0 +1,16 @@
+{{- if .Values.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "auth-service.fullname" . }}
+  namespace: {{ .Values.global.namespace | default "sa-p5" }}
+  labels:
+    {{- include "auth-service.labels" . | nindent 4 }}
+
+spec:
+  minAvailable: {{ .Values.pdb.minAvailable }}
+
+  selector:
+    matchLabels:
+      {{- include "auth-service.selectorLabels" . | nindent 6 }}
+{{- end }}
