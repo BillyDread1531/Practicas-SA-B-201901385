@@ -1,0 +1,16 @@
+{{- if .Values.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "cursos-service.fullname" . }}
+  namespace: {{ .Values.global.namespace | default "sa-p5" }}
+  labels:
+    {{- include "cursos-service.labels" . | nindent 4 }}
+
+spec:
+  minAvailable: {{ .Values.pdb.minAvailable }}
+
+  selector:
+    matchLabels:
+      {{- include "cursos-service.selectorLabels" . | nindent 6 }}
+{{- end }}

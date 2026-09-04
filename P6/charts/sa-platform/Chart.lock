@@ -1,0 +1,24 @@
+dependencies:
+- name: auth-service
+  repository: file://../auth-service
+  version: 1.0.0
+- name: cursos-service
+  repository: file://../cursos-service
+  version: 1.0.0
+- name: estudiantes-service
+  repository: file://../estudiantes-service
+  version: 1.0.0
+- name: inscripciones-service
+  repository: file://../inscripciones-service
+  version: 1.0.0
+- name: gateway
+  repository: file://../gateway
+  version: 1.0.0
+- name: postgresql
+  repository: https://charts.bitnami.com/bitnami
+  version: 18.8.13
+- name: rabbitmq
+  repository: https://charts.bitnami.com/bitnami
+  version: 16.0.14
+digest: sha256:f79d7a7cc1df52fde5430b30ffeef9aa42654f06678f686e4b76a9ddea2c23c1
+generated: "2026-08-28T00:15:06.0683057-06:00"
