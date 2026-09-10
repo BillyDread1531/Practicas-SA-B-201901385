@@ -198,11 +198,25 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Iniciar AKS
+      - name: Verificar e iniciar AKS
+        shell: bash
         run: |
-          az aks start \
+          STATE=$(az aks show \
             --resource-group "$AKS_RESOURCE_GROUP" \
-            --name "$AKS_CLUSTER_NAME"
+            --name "$AKS_CLUSTER_NAME" \
+            --query "powerState.code" \
+            -o tsv)
+
+          echo "Estado actual de AKS: $STATE"
+
+          if [ "$STATE" = "Stopped" ]; then
+            echo "El cluster esta detenido. Iniciando..."
+            az aks start \
+              --resource-group "$AKS_RESOURCE_GROUP" \
+              --name "$AKS_CLUSTER_NAME"
+          else
+            echo "El cluster ya esta activo. Continuando..."
+          fi
 
       - name: Obtener credenciales AKS
         run: |
@@ -293,4 +307,5 @@ jobs:
         run: |
           kubectl get pods -n "$K8S_NAMESPACE"
           kubectl get svc -n "$K8S_NAMESPACE"
+
 
