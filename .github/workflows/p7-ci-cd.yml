@@ -259,6 +259,12 @@ jobs:
               targetPort: 3000
           EOF
 
+      - name: Actualizar imagen de CronJobs
+        shell: bash
+        run: |
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          sed -i "s#acrsa201901385.azurecr.io/cronjobs:p6#ghcr.io/$OWNER/cronjobs:${GITHUB_REF_NAME}#g" P6/charts/sa-platform/templates/cronjobs.yaml
+
       - name: Actualizar dependencias Helm
         working-directory: P6/charts/sa-platform
         run: helm dependency update
@@ -287,3 +293,4 @@ jobs:
         run: |
           kubectl get pods -n "$K8S_NAMESPACE"
           kubectl get svc -n "$K8S_NAMESPACE"
+
