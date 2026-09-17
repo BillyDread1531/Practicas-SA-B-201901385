@@ -1,0 +1,355 @@
+# ============================================================
+# 1. DENEGAR TODO POR DEFECTO
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: {{ .Values.global.namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# ============================================================
+# 2. PERMITIR DNS A TODOS LOS PODS
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: {{ .Values.global.namespace }}
+spec:
+  podSelector: {}
+
+  policyTypes:
+    - Egress
+
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+
+      ports:
+        - protocol: UDP
+          port: 53
+
+        - protocol: TCP
+          port: 53
+
+---
+# ============================================================
+# 3. INGRESS NGINX -> GATEWAY
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-gateway
+  namespace: {{ .Values.global.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gateway
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+
+      ports:
+        - protocol: TCP
+          port: 3000
+
+---
+# ============================================================
+# 4. GATEWAY -> MICROSERVICIOS
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-egress
+  namespace: {{ .Values.global.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gateway
+
+  policyTypes:
+    - Egress
+
+  egress:
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - auth-service
+                  - cursos-service
+                  - estudiantes-service
+                  - inscripciones-service
+
+      ports:
+        - protocol: TCP
+          port: 3001
+
+        - protocol: TCP
+          port: 3002
+
+        - protocol: TCP
+          port: 3003
+
+        - protocol: TCP
+          port: 3004
+
+---
+# ============================================================
+# 5. SOLO GATEWAY -> MICROSERVICIOS
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: microservices-from-gateway
+  namespace: {{ .Values.global.namespace }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values:
+          - auth-service
+          - cursos-service
+          - estudiantes-service
+          - inscripciones-service
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gateway
+
+---
+# ============================================================
+# 6. MICROSERVICIOS AUTORIZADOS -> POSTGRESQL
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: microservices-to-postgresql
+  namespace: {{ .Values.global.namespace }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values:
+          - auth-service
+          - cursos-service
+          - estudiantes-service
+          - inscripciones-service
+          - inscripciones-consumer
+
+  policyTypes:
+    - Egress
+
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+
+      ports:
+        - protocol: TCP
+          port: 5432
+
+---
+# ============================================================
+# 7. CRON INSERT Y CRON RESUMEN -> POSTGRESQL
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cron-workloads-egress
+  namespace: {{ .Values.global.namespace }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values:
+          - cron-insert
+          - cron-resumen
+
+  policyTypes:
+    - Egress
+
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: rabbitmq
+
+      ports:
+        - protocol: TCP
+          port: 5672
+
+---
+# ============================================================
+# 8. CONSUMER DEL CRON -> POSTGRESQL Y RABBITMQ
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cron-consumer-egress
+  namespace: {{ .Values.global.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: cron-resumen-consumer
+
+  policyTypes:
+    - Egress
+
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: rabbitmq
+
+      ports:
+        - protocol: TCP
+          port: 5672
+
+---
+# ============================================================
+# 9. INSCRIPCIONES -> RABBITMQ
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: inscripciones-to-rabbitmq
+  namespace: {{ .Values.global.namespace }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values:
+          - inscripciones-service
+          - inscripciones-consumer
+
+  policyTypes:
+    - Egress
+
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: rabbitmq
+
+      ports:
+        - protocol: TCP
+          port: 5672
+
+---
+# ============================================================
+# 10. POSTGRESQL SOLO RECIBE DE WORKLOADS AUTORIZADOS
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgresql-from-services
+  namespace: {{ .Values.global.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - auth-service
+                  - cursos-service
+                  - estudiantes-service
+                  - inscripciones-service
+                  - inscripciones-consumer
+                  - cron-insert
+                  - cron-resumen
+                  - cron-resumen-consumer
+
+      ports:
+        - protocol: TCP
+          port: 5432
+
+---
+# ============================================================
+# 11. RABBITMQ SOLO RECIBE DE PRODUCTORES/CONSUMIDORES
+#     AUTORIZADOS
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rabbitmq-from-authorized-services
+  namespace: {{ .Values.global.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - inscripciones-service
+                  - inscripciones-consumer
+                  - cron-resumen
+                  - cron-resumen-consumer
+
+      ports:
+        - protocol: TCP
+          port: 5672

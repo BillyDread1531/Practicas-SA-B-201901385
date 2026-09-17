@@ -1,0 +1,102 @@
+﻿global:
+  namespace: sa-p8
+  environment: dev
+  logLevel: info
+
+nameOverride: ""
+fullnameOverride: ""
+
+auth-service:
+  enabled: true
+
+cursos-service:
+  enabled: true
+
+estudiantes-service:
+  enabled: true
+
+inscripciones-service:
+  enabled: true
+
+gateway:
+  enabled: true
+
+postgresql:
+  enabled: true
+  namespaceOverride: sa-p8
+  fullnameOverride: postgresql
+
+  image:
+    registry: registry-1.docker.io
+    repository: bitnami/postgresql
+    tag: ""
+    digest: "sha256:b69d1fca390fb131639e86e820f248acfc5d911339dc884796f8009260c598d7"
+    pullPolicy: IfNotPresent
+
+  auth:
+    enablePostgresUser: true
+    username: sa_user
+    database: academia
+    existingSecret: sa-platform-secrets
+    secretKeys:
+      adminPasswordKey: postgres-password
+      userPasswordKey: password
+
+  primary:
+    networkPolicy:
+      enabled: false
+
+    initdb:
+      scriptsConfigMap: sa-platform-db-init
+
+    persistence:
+      enabled: true
+      size: 1Gi
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 384Mi
+
+rabbitmq:
+  enabled: true
+  namespaceOverride: sa-p8
+  fullnameOverride: rabbitmq
+
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/rabbitmq
+    tag: 4.1.3-debian-12-r1
+
+  networkPolicy:
+    enabled: false
+
+  auth:
+    username: sa_rabbit
+    existingPasswordSecret: sa-platform-secrets
+    existingSecretPasswordKey: rabbitmq-password
+    existingErlangSecret: sa-platform-secrets
+    existingSecretErlangKey: rabbitmq-erlang-cookie
+
+  persistence:
+    enabled: true
+    size: 1Gi
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+
+secrets: {}
+
+
+
+
+
+

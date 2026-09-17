@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: sa-p8-limits
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "sa-platform.labels" . | nindent 4 }}
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 50m
+        memory: 64Mi
+      default:
+        cpu: 300m
+        memory: 256Mi

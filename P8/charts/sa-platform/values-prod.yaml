@@ -1,0 +1,84 @@
+
+global:
+  environment: prod
+  logLevel: warn
+
+auth-service:
+  replicaCount: 3
+  image:
+    tag: "1.0.1"
+  config:
+    LOG_LEVEL: "warn"
+  autoscaling:
+    minReplicas: 3
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+cursos-service:
+  replicaCount: 3
+  image:
+    tag: "1.0.1"
+  config:
+    LOG_LEVEL: "warn"
+  autoscaling:
+    minReplicas: 3
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+estudiantes-service:
+  replicaCount: 3
+  image:
+    tag: "1.0.1"
+  config:
+    LOG_LEVEL: "warn"
+  autoscaling:
+    minReplicas: 3
+  resources:
+    requests:
+      cpu: 125m
+      memory: 128Mi
+    limits:
+      cpu: 350m
+      memory: 256Mi
+
+inscripciones-service:
+  replicaCount: 3
+  image:
+    tag: "1.0.1"
+  config:
+    LOG_LEVEL: "warn"
+  autoscaling:
+    minReplicas: 3
+  resources:
+    requests:
+      cpu: 125m
+      memory: 128Mi
+    limits:
+      cpu: 350m
+      memory: 256Mi
+
+gateway:
+  replicaCount: 3
+  image:
+    tag: "1.0.1"
+  config:
+    LOG_LEVEL: "warn"
+  autoscaling:
+    minReplicas: 3
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: sa-p8-quota
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "sa-platform.labels" . | nindent 4 }}
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 2Gi
+    limits.cpu: "4"
+    limits.memory: 4Gi
+    pods: "30"
+    persistentvolumeclaims: "5"
