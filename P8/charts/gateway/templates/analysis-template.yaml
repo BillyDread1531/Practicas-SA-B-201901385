@@ -9,9 +9,10 @@ spec:
     - name: gateway-health
       interval: 10s
       count: 3
-      successCondition: result == 200
       failureLimit: 0
+      successCondition: 'result == "ok"'
       provider:
-        http:
-          url: http://{{ include "gateway.fullname" . }}-canary:{{ .Values.service.port }}/health
+        web:
+          url: "http://{{ include "gateway.fullname" . }}-canary.{{ $global.namespace | default "sa-p8" }}.svc.cluster.local:{{ .Values.service.port }}/health"
           timeoutSeconds: 5
+          jsonPath: "{$.status}"

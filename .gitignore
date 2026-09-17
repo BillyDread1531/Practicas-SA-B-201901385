@@ -1,2 +1,4 @@
 
 P6/charts/sa-platform/values-secret.yaml
+# P8 generated Helm render
+/P8/helm-dev-rendered.yaml

@@ -1,0 +1,40 @@
+﻿apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: p8-require-resources
+  annotations:
+    policies.kyverno.io/title: Require CPU and memory resources
+    policies.kyverno.io/category: Resource Management
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: Every container must define CPU and memory requests and limits.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: require-cpu-memory
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: "Cada contenedor debe definir requests y limits de CPU y memoria."
+        foreach:
+          - list: "request.object.spec.containers"
+            pattern:
+              resources:
+                requests:
+                  cpu: "?*"
+                  memory: "?*"
+                limits:
+                  cpu: "?*"
+                  memory: "?*"
+          - list: "request.object.spec.initContainers"
+            pattern:
+              resources:
+                requests:
+                  cpu: "?*"
+                  memory: "?*"
+                limits:
+                  cpu: "?*"
+                  memory: "?*"

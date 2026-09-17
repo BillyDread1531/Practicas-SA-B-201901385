@@ -1,0 +1,30 @@
+﻿apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: p8-require-non-root
+  annotations:
+    policies.kyverno.io/title: Require non-root execution
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: Containers must explicitly run as non-root.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: require-non-root
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: "Los contenedores deben ejecutarse como usuario no root."
+        foreach:
+          - list: "request.object.spec.containers"
+            pattern:
+              securityContext:
+                runAsNonRoot: true
+          - list: "request.object.spec.initContainers"
+            pattern:
+              securityContext:
+                runAsNonRoot: true

@@ -100,3 +100,8 @@ secrets: {}
 
 
 
+
+cronjobs:
+  image:
+    repository: acrsa201901385.azurecr.io/cronjobs
+    tag: "p6"

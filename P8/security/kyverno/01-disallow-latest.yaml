@@ -1,0 +1,44 @@
+﻿apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: p8-disallow-latest
+  annotations:
+    policies.kyverno.io/title: Disallow latest tag
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: Images must use an explicit version tag and cannot use latest.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: require-image-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: "Las imagenes deben usar un tag explicito."
+        foreach:
+          - list: "request.object.spec.containers"
+            pattern:
+              image: "*:*"
+          - list: "request.object.spec.initContainers"
+            pattern:
+              image: "*:*"
+
+    - name: validate-image-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: "La imagen :latest no esta permitida."
+        foreach:
+          - list: "request.object.spec.containers"
+            pattern:
+              image: "!*:latest"
+          - list: "request.object.spec.initContainers"
+            pattern:
+              image: "!*:latest"

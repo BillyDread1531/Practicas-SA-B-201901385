@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # CRONJOB 1
 # CADA 2 MINUTOS INSERTA REGISTRO
 # ============================================================
@@ -37,7 +37,7 @@ spec:
 
           containers:
             - name: cron-insert
-              image: acrsa201901385.azurecr.io/cronjobs:p6
+              image: {{ .Values.cronjobs.image.repository }}:{{ .Values.cronjobs.image.tag }}
               imagePullPolicy: IfNotPresent
 
               command:
@@ -126,7 +126,7 @@ spec:
 
           containers:
             - name: cron-resumen
-              image: acrsa201901385.azurecr.io/cronjobs:p6
+              image: {{ .Values.cronjobs.image.repository }}:{{ .Values.cronjobs.image.tag }}
               imagePullPolicy: IfNotPresent
 
               command:
@@ -224,7 +224,7 @@ spec:
 
       containers:
         - name: consumer
-          image: acrsa201901385.azurecr.io/cronjobs:p6
+          image: {{ .Values.cronjobs.image.repository }}:{{ .Values.cronjobs.image.tag }}
           imagePullPolicy: IfNotPresent
 
           command:
@@ -309,4 +309,3 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
-

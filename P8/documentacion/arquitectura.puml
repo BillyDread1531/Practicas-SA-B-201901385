@@ -1,0 +1,66 @@
+﻿@startuml
+title P8 - Arquitectura GitOps y entrega progresiva
+
+actor "Desarrollador" as Dev
+
+rectangle "Repositorio principal" as Repo {
+  artifact "Código + Helm" as Code
+  artifact "Terraform" as TF
+  artifact "Kyverno" as Policies
+}
+
+rectangle "GitHub Actions" as CI {
+  artifact "Lint / Template" as Helm
+  artifact "Trivy" as Trivy
+  artifact "Build" as Build
+  artifact "SBOM / Syft" as SBOM
+  artifact "Cosign" as Cosign
+  artifact "k6" as K6
+}
+
+database "Container Registry" as Registry
+database "Repositorio GitOps" as GitOps
+rectangle "Argo CD" as Argo
+
+rectangle "Kubernetes / sa-p8" as K8s {
+  component "Kyverno" as Kyverno
+  component "Sealed Secrets" as Sealed
+  component "Argo Rollouts" as Rollouts
+  component "Gateway Stable" as Stable
+  component "Gateway Canary" as Canary
+  component "Microservicios" as Services
+  component "PostgreSQL / RabbitMQ" as Data
+}
+
+Dev --> Code
+Code --> Helm
+Code --> Build
+TF --> K8s
+Policies --> Kyverno
+Helm --> Trivy
+Build --> Registry
+Build --> SBOM
+Build --> Cosign
+Trivy --> K6
+K6 --> GitOps
+GitOps --> Argo
+Argo --> K8s
+Argo --> Rollouts
+Rollouts --> Stable
+Rollouts --> Canary
+Rollouts --> Services
+Services --> Data
+Sealed --> K8s
+
+note right of Rollouts
+Canary:
+20% -> Analysis
+50% -> Analysis
+80% -> Analysis
+100%
+
+Analysis fallido:
+Abortar + mantener estable
+end note
+
+@enduml

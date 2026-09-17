@@ -809,3 +809,105 @@ El proyecto demuestra la implementación de una arquitectura de microservicios u
 La solución combina servicios desarrollados con Node.js y Python, comunicación REST y GraphQL, autenticación mediante JWT, persistencia con PostgreSQL, un API Gateway como punto de entrada y Docker Compose para administrar la infraestructura.
 
 La separación de responsabilidades permite mantener los componentes desacoplados y facilita la extensión futura del sistema.
+---
+
+# PRACTICA 8 - GitOps, entrega progresiva y seguridad de la cadena de suministro
+
+La Práctica 8 implementa un flujo GitOps para el sistema de microservicios utilizando infraestructura declarativa, Helm, ArgoCD, entrega progresiva mediante canary releases y controles de seguridad de la cadena de suministro.
+
+## Componentes principales
+
+- Terraform para infraestructura del namespace sa-p8.
+- ResourceQuota y LimitRange.
+- ServiceAccounts y RBAC.
+- Helm para empaquetado de los microservicios.
+- ArgoCD como componente encargado de aplicar cambios al clúster.
+- Repositorio GitOps independiente.
+- Argo Rollouts para entrega progresiva.
+- AnalysisTemplate para validar la salud del Gateway.
+- Kyverno para políticas de admisión.
+- Trivy para análisis de vulnerabilidades.
+- SBOM mediante Syft.
+- Firma y verificación de imágenes mediante Cosign.
+- Pruebas smoke, integración y carga mediante k6.
+- Sealed Secrets para evitar almacenar secretos en texto plano.
+
+## Flujo GitOps
+
+`	ext
+Git Tag / Release
+        |
+        v
+GitHub Actions
+        |
+        +--> Helm lint / template
+        |
+        +--> Trivy
+        |
+        +--> Build de imágenes
+        |
+        +--> SBOM
+        |
+        +--> Cosign sign + verify
+        |
+        +--> k6
+        |
+        v
+Actualización automática del repositorio GitOps
+        |
+        v
+Pull Request
+        |
+        v
+Merge
+        |
+        v
+ArgoCD
+        |
+        v
+Kubernetes / AKS
+        |
+        v
+Argo Rollouts
+        |
+        +--> 20%
+        +--> 50%
+        +--> 80%
+        +--> 100%
+`",
+        ",
+        
+
+El pipeline valida los manifiestos Helm y realiza análisis de seguridad antes de publicar las imágenes.
+
+Las imágenes utilizan versiones explícitas y no latest.
+
+Se generan SBOM mediante Syft y las imágenes son firmadas y verificadas mediante Cosign.
+
+Kyverno aplica políticas para:
+
+- Prohibir la etiqueta latest.
+- Exigir requests y limits de CPU y memoria.
+- Exigir ejecución de los workloads como usuario no root.
+
+Los secretos de aplicación se gestionan mediante Sealed Secrets y no se almacenan en texto plano dentro del repositorio GitOps.
+
+## Entrega progresiva
+
+El Gateway utiliza una estrategia canary con etapas del 20%, 50%, 80% y 100%.
+
+Las etapas intermedias cuentan con AnalysisRuns que consultan el endpoint /health del servicio canary.
+
+Cuando un análisis falla, Argo Rollouts puede abortar la actualización y devolver el tráfico a la versión estable.
+
+## Evidencia de reversión
+
+Durante la validación se utilizó una revisión defectuosa del Gateway. El AnalysisRun detectó errores consecutivos contra el servicio canary y Argo Rollouts abortó la actualización, restaurando el selector canary a la versión estable y reduciendo la réplica defectuosa.
+
+Esta evidencia se conserva en el historial de Rollouts y forma parte de la demostración de entrega progresiva y reversión automática.
+
+## Repositorios
+
+La implementación de la Práctica 8 se encuentra dentro de P8/.
+
+La configuración GitOps independiente se encuentra en el repositorio Practica-SA-P8-GitOps.
