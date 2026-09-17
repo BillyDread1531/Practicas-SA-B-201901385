@@ -1,12 +1,31 @@
+{{- $global := .Values.global | default (dict) -}}
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "gateway.fullname" . }}
-  namespace: {{ .Values.global.namespace | default "sa-p8" }}
+  namespace: {{ $global.namespace | default "sa-p8" }}
   labels:
     {{- include "gateway.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
+  selector:
+    {{- include "gateway.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "gateway.fullname" . }}-canary
+  namespace: {{ $global.namespace | default "sa-p8" }}
+  labels:
+    {{- include "gateway.labels" . | nindent 4 }}
+    app.kubernetes.io/component: canary
+spec:
+  type: ClusterIP
   selector:
     {{- include "gateway.selectorLabels" . | nindent 4 }}
   ports:

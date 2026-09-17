@@ -1,0 +1,17 @@
+{{- $global := .Values.global | default (dict) -}}
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: gateway-health
+  namespace: {{ $global.namespace | default "sa-p8" }}
+spec:
+  metrics:
+    - name: gateway-health
+      interval: 10s
+      count: 3
+      successCondition: result == 200
+      failureLimit: 0
+      provider:
+        http:
+          url: http://{{ include "gateway.fullname" . }}-canary:{{ .Values.service.port }}/health
+          timeoutSeconds: 5

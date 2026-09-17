@@ -1,11 +1,15 @@
+{{- $global := .Values.global | default (dict) -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "gateway.fullname" . }}-config
-  namespace: {{ .Values.global.namespace | default "sa-p8" }}
+  namespace: {{ $global.namespace | default "sa-p8" }}
   labels:
     {{- include "gateway.labels" . | nindent 4 }}
 data:
-{{- range $key, $value := .Values.config }}
-  {{ $key }}: {{ $value | quote }}
-{{- end }}
+  PORT: {{ .Values.config.PORT | quote }}
+  AUTH_SERVICE: {{ .Values.config.AUTH_SERVICE | quote }}
+  CURSOS_SERVICE: {{ .Values.config.CURSOS_SERVICE | quote }}
+  INSCRIPCIONES_SERVICE: {{ .Values.config.INSCRIPCIONES_SERVICE | quote }}
+  ESTUDIANTES_SERVICE: {{ .Values.config.ESTUDIANTES_SERVICE | quote }}
+  LOG_LEVEL: {{ .Values.config.LOG_LEVEL | quote }}

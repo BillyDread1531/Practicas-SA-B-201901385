@@ -1,21 +1,19 @@
+{{- $global := .Values.global | default (dict) -}}
 {{- if .Values.autoscaling.enabled }}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: {{ include "gateway.fullname" . }}
-  namespace: {{ .Values.global.namespace | default "sa-p8" }}
+  namespace: {{ $global.namespace | default "sa-p8" }}
   labels:
     {{- include "gateway.labels" . | nindent 4 }}
-
 spec:
   scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
+    apiVersion: argoproj.io/v1alpha1
+    kind: Rollout
     name: {{ include "gateway.fullname" . }}
-
   minReplicas: {{ .Values.autoscaling.minReplicas }}
   maxReplicas: {{ .Values.autoscaling.maxReplicas }}
-
   metrics:
     - type: Resource
       resource:
