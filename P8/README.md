@@ -15,7 +15,7 @@ Este es el documento principal de localización de evidencias para la Práctica 
 | Bloqueo por vulnerabilidad crítica | [Workflow con Trivy](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/.github/workflows/p8-secure-gitops.yml). No existe un PR bloqueado público disponible. |
 | Imagen firmada | `acrsa201901385.azurecr.io/gateway:1.0.4`. Verificación Cosign incluida en el workflow. |
 | Reporte de prueba de carga | [Reporte k6](evidencias/06-k6-load.txt), [resumen JSON](evidencias/k6-load-summary.json) y [script](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/P8/tests/k6/load.js) |
-| Video demostrativo | Pendiente de grabación. Guion: arquitectura 00:00-01:00, Terraform/Helm 01:00-02:00, CI y seguridad 02:00-03:00, ArgoCD 03:00-04:00, Canary 04:00-05:00, rollback 05:00-06:00 y Kyverno 06:00-07:00. |
+| Video demostrativo | [video-p8-gitops-201901385.mp4](evidencias/video-p8-gitops-201901385.mp4). Minutaje: arquitectura 00:00-01:00, Terraform/Helm 01:00-02:00, CI y seguridad 02:00-03:00, ArgoCD 03:00-04:00, Canary 04:00-05:00, rollback 05:00-06:00 y Kyverno 06:00-07:00. |
 
 ## Flujo técnico
 
@@ -61,3 +61,4 @@ Las pruebas están en [P8/tests](https://github.com/BillyDread1531/Practicas-SA-
 - [Registro del verificador](evidencias/07-verificador-final.txt)
 - [Captura GitHub Actions](evidencias/08-github-actions-exitoso.png)
 - [Captura del diagrama](evidencias/09-diagrama-gitops.png)
+- [Video demostrativo](evidencias/video-p8-gitops-201901385.mp4)
