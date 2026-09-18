@@ -145,11 +145,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push image
+      - name: Build image
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
-          push: true
+          load: true
           tags: |
             ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:${{ steps.version.outputs.version }}
             ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:${{ github.sha }}
@@ -180,6 +180,13 @@ jobs:
         with:
           name: sbom-${{ matrix.image }}
           path: "${{ matrix.image }}-*.spdx.json"
+
+      - name: Push verified image
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          docker push "${IMAGE_PREFIX}/${{ matrix.image }}:${VERSION}"
+          docker push "${IMAGE_PREFIX}/${{ matrix.image }}:${{ github.sha }}"
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3
