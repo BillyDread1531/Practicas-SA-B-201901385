@@ -14,7 +14,7 @@ Este es el documento principal de localización de evidencias para la Práctica 
 | Despliegue rechazado por política | [Políticas Kyverno](https://github.com/BillyDread1531/Practicas-SA-B-201901385/tree/main/P8/security/kyverno) y [manifiestos de evidencia](https://github.com/BillyDread1531/Practicas-SA-B-201901385/tree/main/P8/documentacion). La URL directa del evento de rechazo no está publicada. |
 | Bloqueo por vulnerabilidad crítica | [Workflow con Trivy](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/.github/workflows/p8-secure-gitops.yml). La URL directa del Pull Request bloqueado no está publicada. |
 | Imagen firmada | `acrsa201901385.azurecr.io/gateway:1.0.4`. Verificación Cosign incluida en el workflow. |
-| Reporte de prueba de carga | [P8/tests/k6/load.js](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/P8/tests/k6/load.js) |
+| Reporte de prueba de carga | [Reporte k6](evidencias/06-k6-load.txt), [resumen JSON](evidencias/k6-load-summary.json) y [script](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/P8/tests/k6/load.js) |
 | Video demostrativo | No publicado. Guion de demostración: arquitectura 00:00-01:00, Terraform/Helm 01:00-02:00, CI y seguridad 02:00-03:00, ArgoCD 03:00-04:00, Canary 04:00-05:00, rollback 05:00-06:00 y Kyverno 06:00-07:00. |
 
 ## Flujo técnico
