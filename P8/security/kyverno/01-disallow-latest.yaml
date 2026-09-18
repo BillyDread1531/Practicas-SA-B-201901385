@@ -17,6 +17,12 @@ spec:
           - resources:
               kinds:
                 - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - argocd
+                - kyverno
       validate:
         message: "Las imagenes deben usar un tag explicito."
         foreach:
@@ -33,6 +39,12 @@ spec:
           - resources:
               kinds:
                 - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - argocd
+                - kyverno
       validate:
         message: "La imagen :latest no esta permitida."
         foreach:

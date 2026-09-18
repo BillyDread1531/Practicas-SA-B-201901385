@@ -17,6 +17,12 @@ spec:
           - resources:
               kinds:
                 - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - argocd
+                - kyverno
       validate:
         message: "Cada contenedor debe definir requests y limits de CPU y memoria."
         foreach:

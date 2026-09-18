@@ -17,6 +17,12 @@ spec:
           - resources:
               kinds:
                 - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - argocd
+                - kyverno
       validate:
         message: "Los contenedores deben ejecutarse como usuario no root."
         foreach:
