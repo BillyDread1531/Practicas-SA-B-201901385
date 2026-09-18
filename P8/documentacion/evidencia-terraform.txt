@@ -1,0 +1,35 @@
+﻿=== TERRAFORM P8 - EVIDENCIA PLAN/APPLY ===
+
+Fecha: 2026-09-18 02:56:45
+
+PLAN:
+No changes. Your infrastructure matches the configuration.
+
+APPLY:
+Apply complete! Resources: 0 added, 0 changed, 0 destroyed.
+
+OUTPUTS:
+namespace = sa-p8
+resource_quota = sa-p8-quota
+limit_range = sa-p8-limits
+role = sa-p8-reader
+
+SERVICE ACCOUNTS:
+auth-sa
+cron-consumer-sa
+cron-insert-sa
+cron-resumen-sa
+cursos-sa
+estudiantes-sa
+gateway-sa
+inscripciones-sa
+
+ROLE BINDINGS:
+auth-reader
+cron-consumer-reader
+cron-insert-reader
+cron-resumen-reader
+cursos-reader
+estudiantes-reader
+gateway-reader
+inscripciones-reader

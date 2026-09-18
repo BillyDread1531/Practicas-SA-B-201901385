@@ -1,0 +1,19 @@
+kubectl : Error from server: error when creating 
+".\\documentacion\\kyverno-rejection-test.yaml": admission webhook "validate.kyverno.svc-fail" 
+denied the request: 
+En línea: 1 Carácter: 1
++ kubectl apply -f .\documentacion\kyverno-rejection-test.yaml 2>&1 | T ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Error from serv...d the request: :String) [], Rem 
+   oteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+resource Pod/sa-p8/p8-kyverno-rejection-test was blocked due to the following policies 
+
+p8-disallow-latest:
+  validate-image-tag: 'validation failure: validation error: La imagen :latest no esta 
+permitida. rule validate-image-tag failed at path /image/'
+p8-require-non-root:
+  require-non-root: 'validation failure: validation error: Los contenedores deben ejecutarse 
+como usuario no root. rule require-non-root failed at path /securityContext/runAsNonRoot/'

@@ -143,3 +143,79 @@ output "service_accounts" {
 }
 
 
+
+# ============================================================
+# ROLE DE LECTURA
+# ============================================================
+
+resource "kubernetes_role" "sa_p8_reader" {
+  metadata {
+    name      = "sa-p8-reader"
+    namespace = kubernetes_namespace.sa_p8.metadata[0].name
+
+    labels = {
+      "app.kubernetes.io/part-of" = "sa-platform"
+      "managed-by"                = "terraform"
+    }
+  }
+
+  rule {
+    api_groups = [""]
+    resources  = ["endpoints", "pods", "pods/log", "services"]
+    verbs      = ["get", "list", "watch"]
+  }
+
+  rule {
+    api_groups = ["apps"]
+    resources  = ["deployments", "replicasets"]
+    verbs      = ["get", "list", "watch"]
+  }
+
+  rule {
+    api_groups = ["argoproj.io"]
+    resources  = ["rollouts"]
+    verbs      = ["get", "list", "watch"]
+  }
+}
+
+# ============================================================
+# ROLE BINDINGS DE LECTURA
+# ============================================================
+
+resource "kubernetes_role_binding" "service_readers" {
+  for_each = toset(local.services)
+
+  metadata {
+    name      = "${each.key}-reader"
+    namespace = kubernetes_namespace.sa_p8.metadata[0].name
+
+    labels = {
+      "app.kubernetes.io/part-of"   = "sa-platform"
+      "app.kubernetes.io/component" = each.key
+      "managed-by"                  = "terraform"
+    }
+  }
+
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "Role"
+    name      = kubernetes_role.sa_p8_reader.metadata[0].name
+  }
+
+  subject {
+    kind      = "ServiceAccount"
+    name      = kubernetes_service_account.services[each.key].metadata[0].name
+    namespace = kubernetes_namespace.sa_p8.metadata[0].name
+  }
+}
+
+output "role" {
+  value = kubernetes_role.sa_p8_reader.metadata[0].name
+}
+
+output "role_bindings" {
+  value = [
+    for binding in kubernetes_role_binding.service_readers :
+    binding.metadata[0].name
+  ]
+}

@@ -1,0 +1,4 @@
+NAME                   ADMISSION   BACKGROUND   READY
+p8-disallow-latest     Enforce     true         <none>
+p8-require-resources   Enforce     true         <none>
+p8-require-non-root    Enforce     true         <none>
