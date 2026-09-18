@@ -45,3 +45,10 @@ Las pruebas están en [P8/tests](https://github.com/BillyDread1531/Practicas-SA-
 - [Matriz de evidencias](documentacion/evidencias.md)
 - [Informe de incidente](documentacion/incidente-rollback.md)
 - [Teoría y preguntas de defensa](documentacion/teoria.md)
+
+## Evidencias registradas
+
+- [Índice de evidencias](evidencias/README.md)
+- [Estado final de ArgoCD y Rollout](evidencias/evidencia-estado-final.md)
+- [Rollback y AnalysisRun fallido](evidencias/evidencia-rollback.md)
+- [Verificación Cosign](evidencias/evidencia-cosign.md)
