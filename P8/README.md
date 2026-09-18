@@ -1,102 +1,47 @@
-﻿# P8 - GitOps, entrega progresiva y seguridad de la cadena de suministro
+﻿# P8 - README de entrega
 
-## Flujo de entrega
+Este es el documento principal de localización de evidencias para la Práctica 8.
 
-Código fuente → GitHub Actions → validaciones → imagen versionada → PR GitOps → Argo CD → Kubernetes → Argo Rollouts → Canary → análisis → promoción o rollback.
+## 4.1 Tabla obligatoria de enlaces
 
-## Componentes
-
-- Terraform: infraestructura base del namespace.
-- Helm: empaquetado y configuración de los servicios.
-- GitHub Actions: integración continua y seguridad.
-- Trivy: análisis de vulnerabilidades.
-- Syft: generación de SBOM.
-- Cosign: firma y verificación de imágenes.
-- k6: pruebas smoke, integración y carga.
-- Argo CD: sincronización GitOps.
-- Argo Rollouts: entrega progresiva Canary y rollback.
-- Kyverno: políticas de admisión.
-- Sealed Secrets: manejo seguro de secretos.
-
-## Evidencias y enlaces
-
-| Evidencia | Ubicación |
+| Ítem | Enlace o dato requerido |
 |---|---|
-| Repositorio de código | https://github.com/BillyDread1531/Practicas-SA-B-201901385 |
-| Repositorio GitOps | https://github.com/BillyDread1531/Practica-SA-P8-GitOps |
-| Workflow CI/CD seguro | https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/.github/workflows/p8-secure-gitops.yml |
-| Terraform | https://github.com/BillyDread1531/Practicas-SA-B-201901385/tree/main/P8/terraform |
-| Helm | https://github.com/BillyDread1531/Practicas-SA-B-201901385/tree/main/P8/charts |
-| GitOps Application | https://github.com/BillyDread1531/Practica-SA-P8-GitOps/blob/main/apps/sa-platform-dev.yaml |
-| Valores de desarrollo | https://github.com/BillyDread1531/Practica-SA-P8-GitOps/blob/main/environments/dev/values.yaml |
-| Políticas Kyverno | https://github.com/BillyDread1531/Practicas-SA-B-201901385/tree/main/P8/security/kyverno |
-| Sealed Secrets | https://github.com/BillyDread1531/Practicas-SA-B-201901385/tree/main/P8/charts/sa-platform/templates |
-| Pruebas | https://github.com/BillyDread1531/Practicas-SA-B-201901385/tree/main/P8/tests |
-| Documentación | https://github.com/BillyDread1531/Practicas-SA-B-201901385/tree/main/P8/documentacion |
+| Repositorio GitOps | [Practica-SA-P8-GitOps](https://github.com/BillyDread1531/Practica-SA-P8-GitOps) |
+| URL pública | [Repositorio de código](https://github.com/BillyDread1531/Practicas-SA-B-201901385) y [repositorio GitOps](https://github.com/BillyDread1531/Practica-SA-P8-GitOps) |
+| Aplicación en ArgoCD | `sa-platform-dev` en namespace `argocd`; destino Kubernetes `sa-p8`. [Manifiesto](https://github.com/BillyDread1531/Practica-SA-P8-GitOps/blob/main/apps/sa-platform-dev.yaml) |
+| Ejecución exitosa del pipeline | [Workflow p8-secure-gitops.yml](https://github.com/BillyDread1531/Practicas-SA-B-201901385/actions/workflows/p8-secure-gitops.yml). El run directo no está publicado en el workspace. |
+| Reversión automática | [Informe de incidente](documentacion/incidente-rollback.md), [Rollout](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/P8/charts/gateway/templates/rollout.yaml) y [AnalysisTemplate](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/P8/charts/gateway/templates/analysis-template.yaml). El run directo no está publicado. |
+| Despliegue rechazado por política | [Políticas Kyverno](https://github.com/BillyDread1531/Practicas-SA-B-201901385/tree/main/P8/security/kyverno) y [manifiestos de evidencia](https://github.com/BillyDread1531/Practicas-SA-B-201901385/tree/main/P8/documentacion). La URL directa del evento de rechazo no está publicada. |
+| Bloqueo por vulnerabilidad crítica | [Workflow con Trivy](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/.github/workflows/p8-secure-gitops.yml). La URL directa del Pull Request bloqueado no está publicada. |
+| Imagen firmada | `acrsa201901385.azurecr.io/gateway:1.0.4`. Verificación Cosign incluida en el workflow. |
+| Reporte de prueba de carga | [P8/tests/k6/load.js](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/P8/tests/k6/load.js) |
+| Video demostrativo | No publicado. Guion de demostración: arquitectura 00:00-01:00, Terraform/Helm 01:00-02:00, CI y seguridad 02:00-03:00, ArgoCD 03:00-04:00, Canary 04:00-05:00, rollback 05:00-06:00 y Kyverno 06:00-07:00. |
+
+## Flujo técnico
+
+Código fuente -> GitHub Actions -> validaciones -> imagen versionada -> Pull Request GitOps -> ArgoCD -> Kubernetes -> Argo Rollouts -> Canary -> análisis -> promoción o rollback.
+
+| Componente | Responsabilidad | Evidencia |
+|---|---|---|
+| Terraform | Namespace, cuotas, límites y RBAC | [P8/terraform](https://github.com/BillyDread1531/Practicas-SA-B-201901385/tree/main/P8/terraform) |
+| Helm | Empaquetado de servicios y configuración | [P8/charts](https://github.com/BillyDread1531/Practicas-SA-B-201901385/tree/main/P8/charts) |
+| GitHub Actions | Lint, template, Trivy, SBOM, firma y PR GitOps | [p8-secure-gitops.yml](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/.github/workflows/p8-secure-gitops.yml) |
+| ArgoCD | Sincronización declarativa | [Application](https://github.com/BillyDread1531/Practica-SA-P8-GitOps/blob/main/apps/sa-platform-dev.yaml) |
+| Argo Rollouts | Canary 20/50/80/100 y rollback | [Manifiestos gateway](https://github.com/BillyDread1531/Practicas-SA-B-201901385/tree/main/P8/charts/gateway/templates) |
+| Kyverno | No `latest`, recursos obligatorios y no root | [Políticas](https://github.com/BillyDread1531/Practicas-SA-B-201901385/tree/main/P8/security/kyverno) |
+| Sealed Secrets | Gestión de secretos cifrados | [SealedSecret](https://github.com/BillyDread1531/Practica-SA-P8-GitOps/blob/main/security/sealed-secret.yaml) |
 
 ## Entrega progresiva
 
-El gateway utiliza estrategia Canary con los siguientes pesos:
+El gateway utiliza Canary con las etapas `20% -> análisis -> 50% -> análisis -> 80% -> análisis -> 100%`. Si el `AnalysisRun` supera el umbral de errores consecutivos, Argo Rollouts aborta la revisión, mantiene la versión estable y reduce la ReplicaSet defectuosa.
 
-20% → análisis → 50% → análisis → 80% → análisis → 100%.
+## Pruebas y seguridad
 
-Ante un resultado fallido del análisis, Argo Rollouts aborta la nueva revisión y restaura el tráfico hacia la versión estable.
+Las pruebas están en [P8/tests](https://github.com/BillyDread1531/Practicas-SA-B-201901385/tree/main/P8/tests): smoke, integración y carga mediante k6. El pipeline valida Helm y manifiestos, bloquea vulnerabilidades críticas con Trivy, genera SBOM con Syft, firma/verifica con Cosign y actualiza el repositorio GitOps mediante Pull Request.
 
-## Seguridad de la cadena de suministro
+## Documentación adicional
 
-La integración continua realiza:
-
-1. Validación de Helm.
-2. Validación de manifiestos.
-3. Análisis Trivy.
-4. Generación de SBOM mediante Syft.
-5. Firma mediante Cosign.
-6. Verificación de firma.
-7. Construcción de imágenes con versión derivada del tag Git.
-8. Actualización del repositorio GitOps mediante Pull Request.
-
-## Políticas de admisión
-
-Kyverno aplica:
-
-- Prohibición de imágenes con tag latest.
-- Requerimiento de límites de CPU y memoria.
-- Requerimiento de ejecución como usuario no root.
-
-Las políticas excluyen los namespaces internos de Argo CD y Kyverno para evitar interferir con sus componentes de control.
-
-## Incidente y rollback
-
-Se probó deliberadamente una revisión defectuosa del gateway. El análisis Canary detectó errores durante la validación de salud y Argo Rollouts abortó automáticamente la promoción.
-
-La evidencia muestra:
-
-- nueva ReplicaSet defectuosa creada;
-- tráfico Canary dirigido a la nueva revisión;
-- AnalysisRun con resultado Error;
-- RolloutAbort;
-- restauración del selector estable;
-- reducción de la ReplicaSet defectuosa;
-- recuperación del servicio estable.
-
-## Preconditions de evaluación
-
-- P7 previamente entregado.
-- Aplicación Argo CD sa-platform-dev.
-- Namespace sa-p8.
-- Sin despliegues directos mediante kubectl apply, kubectl set image o helm upgrade en el workflow P8.
-- Despliegue gestionado mediante GitOps.
-- Rollback automático demostrado.
-- Repositorio GitOps independiente y público.
-
-## Video de demostración
-
-La demostración debe mostrar:
-
-- 00:00–01:00 arquitectura y repositorios.
-- 01:00–02:00 Terraform y Helm.
-- 02:00–03:00 GitHub Actions y seguridad.
-- 03:00–04:00 Argo CD Synced/Healthy.
-- 04:00–05:00 Canary y AnalysisRun.
-- 05:00–06:00 rollback automático.
-- 06:00–07:00 Kyverno y evidencias finales.
+- [Diagrama de arquitectura y flujo](documentacion/arquitectura.puml)
+- [Matriz de evidencias](documentacion/evidencias.md)
+- [Informe de incidente](documentacion/incidente-rollback.md)
+- [Teoría y preguntas de defensa](documentacion/teoria.md)
