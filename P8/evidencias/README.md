@@ -10,6 +10,18 @@ Estos archivos son registros textuales de verificaciones realizadas sobre el cl�
 - [Políticas Kyverno](evidencia-kyverno.md)
 - [Pruebas k6](evidencia-k6.md)
 
+## Capturas
+
+- [ArgoCD y Rollout](01-argocd-rollout-healthy.png)
+- [Rollback](02-rollback-analysisrun.png)
+- [Políticas Kyverno](03-kyverno-politicas.png)
+- [Rechazo Kyverno](04-kyverno-rechazo.png)
+- [Cosign](05-cosign-verificacion.png)
+- [k6](06-k6-load.png)
+- [Verificador](07-verificador-final.txt)
+- [GitHub Actions](08-github-actions-exitoso.png)
+- [Diagrama](09-diagrama-gitops.png)
+
 ## Pendientes de captura externa
 
 - Run directo de GitHub Actions y artefactos del pipeline.

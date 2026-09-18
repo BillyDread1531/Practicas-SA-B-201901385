@@ -9,13 +9,13 @@ Este es el documento principal de localización de evidencias para la Práctica 
 | Repositorio GitOps | [Practica-SA-P8-GitOps](https://github.com/BillyDread1531/Practica-SA-P8-GitOps) |
 | URL pública | [Repositorio de código](https://github.com/BillyDread1531/Practicas-SA-B-201901385) y [repositorio GitOps](https://github.com/BillyDread1531/Practica-SA-P8-GitOps) |
 | Aplicación en ArgoCD | `sa-platform-dev` en namespace `argocd`; destino Kubernetes `sa-p8`. [Manifiesto](https://github.com/BillyDread1531/Practica-SA-P8-GitOps/blob/main/apps/sa-platform-dev.yaml) |
-| Ejecución exitosa del pipeline | [Workflow p8-secure-gitops.yml](https://github.com/BillyDread1531/Practicas-SA-B-201901385/actions/workflows/p8-secure-gitops.yml). El run directo no está publicado en el workspace. |
-| Reversión automática | [Informe de incidente](documentacion/incidente-rollback.md), [Rollout](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/P8/charts/gateway/templates/rollout.yaml) y [AnalysisTemplate](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/P8/charts/gateway/templates/analysis-template.yaml). El run directo no está publicado. |
-| Despliegue rechazado por política | [Políticas Kyverno](https://github.com/BillyDread1531/Practicas-SA-B-201901385/tree/main/P8/security/kyverno) y [manifiestos de evidencia](https://github.com/BillyDread1531/Practicas-SA-B-201901385/tree/main/P8/documentacion). La URL directa del evento de rechazo no está publicada. |
-| Bloqueo por vulnerabilidad crítica | [Workflow con Trivy](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/.github/workflows/p8-secure-gitops.yml). La URL directa del Pull Request bloqueado no está publicada. |
+| Ejecución exitosa del pipeline | [Workflow p8-secure-gitops.yml](https://github.com/BillyDread1531/Practicas-SA-B-201901385/actions/workflows/p8-secure-gitops.yml) y [captura local](evidencias/08-github-actions-exitoso.png). |
+| Reversión automática | [Informe de incidente](documentacion/incidente-rollback.md), [Rollout](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/P8/charts/gateway/templates/rollout.yaml), [AnalysisTemplate](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/P8/charts/gateway/templates/analysis-template.yaml) y [captura](evidencias/02-rollback-analysisrun.png). |
+| Despliegue rechazado por política | [Políticas Kyverno](https://github.com/BillyDread1531/Practicas-SA-B-201901385/tree/main/P8/security/kyverno) y [captura del rechazo](evidencias/04-kyverno-rechazo.png). |
+| Bloqueo por vulnerabilidad crítica | [Workflow con Trivy](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/.github/workflows/p8-secure-gitops.yml). No existe un PR bloqueado público disponible. |
 | Imagen firmada | `acrsa201901385.azurecr.io/gateway:1.0.4`. Verificación Cosign incluida en el workflow. |
 | Reporte de prueba de carga | [Reporte k6](evidencias/06-k6-load.txt), [resumen JSON](evidencias/k6-load-summary.json) y [script](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/P8/tests/k6/load.js) |
-| Video demostrativo | No publicado. Guion de demostración: arquitectura 00:00-01:00, Terraform/Helm 01:00-02:00, CI y seguridad 02:00-03:00, ArgoCD 03:00-04:00, Canary 04:00-05:00, rollback 05:00-06:00 y Kyverno 06:00-07:00. |
+| Video demostrativo | Pendiente de grabación. Guion: arquitectura 00:00-01:00, Terraform/Helm 01:00-02:00, CI y seguridad 02:00-03:00, ArgoCD 03:00-04:00, Canary 04:00-05:00, rollback 05:00-06:00 y Kyverno 06:00-07:00. |
 
 ## Flujo técnico
 
@@ -52,3 +52,12 @@ Las pruebas están en [P8/tests](https://github.com/BillyDread1531/Practicas-SA-
 - [Estado final de ArgoCD y Rollout](evidencias/evidencia-estado-final.md)
 - [Rollback y AnalysisRun fallido](evidencias/evidencia-rollback.md)
 - [Verificación Cosign](evidencias/evidencia-cosign.md)
+- [Captura ArgoCD/Rollout](evidencias/01-argocd-rollout-healthy.png)
+- [Captura rollback](evidencias/02-rollback-analysisrun.png)
+- [Captura Kyverno](evidencias/03-kyverno-politicas.png)
+- [Captura rechazo Kyverno](evidencias/04-kyverno-rechazo.png)
+- [Captura Cosign](evidencias/05-cosign-verificacion.png)
+- [Captura k6](evidencias/06-k6-load.png)
+- [Registro del verificador](evidencias/07-verificador-final.txt)
+- [Captura GitHub Actions](evidencias/08-github-actions-exitoso.png)
+- [Captura del diagrama](evidencias/09-diagrama-gitops.png)
