@@ -1,4 +1,4 @@
-# =========================
+﻿# =========================
 # ETAPA 1: dependencias
 # =========================
 FROM node:22-alpine AS deps
@@ -7,7 +7,7 @@ WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm install -g npm@12.0.2 && npm ci --omit=dev
+RUN npm ci --omit=dev
 
 
 # =========================
