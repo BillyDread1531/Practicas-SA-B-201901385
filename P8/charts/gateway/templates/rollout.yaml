@@ -1,4 +1,4 @@
-{{- $global := .Values.global | default (dict) -}}
+﻿{{- $global := .Values.global | default (dict) -}}
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 
@@ -47,6 +47,9 @@ spec:
             duration: 20s
 
         - setWeight: 100
+          analysis:
+            templates:
+              - templateName: gateway-health
 
   template:
     metadata:
@@ -124,3 +127,4 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+
