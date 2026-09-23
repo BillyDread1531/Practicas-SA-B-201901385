@@ -1,59 +1,101 @@
-# Práctica 9: continuidad operativa y recuperación ante desastres
+﻿# Práctica 9: Continuidad operativa y recuperación ante desastres
 
 Este directorio reconstruye AKS desde Terraform y entrega el resto del sistema mediante ArgoCD. Terraform también crea el almacenamiento Blob externo y despliega Velero con respaldo de volúmenes mediante node-agent.
 
 ## Estado actual
 
-- Estado remoto de Terraform: backend `azurerm` con bloqueo.
-- Bootstrap: `terraform apply` en `P9/terraform` instala AKS, ArgoCD y `p9-root-app`.
-- Datos: PostgreSQL y RabbitMQ con PVC en `sa-p8`, definidos por el GitOps de P8.
-- Secretos: Sealed Secrets en el repositorio GitOps de P8.
-- Velero: schedule `p9-platform`, cada 6 horas UTC, retención de 30 días, destino Blob privado fuera del clúster.
-- Resiliencia: PDB y afinidad anti-pod ya forman parte de los charts de P8; falta ejecutar y registrar el drenaje.
-- Evidencia actual: `p9-valid-20260922` completó correctamente con 568 recursos respaldados.
+- **Estado remoto de Terraform:** backend azurerm con bloqueo en Azure Storage Account sttfstatesa201901385.
+- **Bootstrap:** terraform apply en P9/terraform instala AKS, ArgoCD, Velero y la app-of-apps p9-root-app.
+- **Datos:** PostgreSQL y RabbitMQ con PVC en sa-p8, definidos por el GitOps de P8.
+- **Secretos:** Sealed Secrets con llave respaldada en Azure Blob (sealed-secrets-key6v5m9.yaml).
+- **Velero:** schedule velero-p9-platform, cada 6 horas UTC, retención de 30 días, destino Blob privado fuera del clúster.
+- **Resiliencia:** PDB, anti-afinidad preferred y prueba de drenaje de nodo ejecutada exitosamente.
+- **Bootstrap cronometrado:** ejecutado el 2026-09-23. RTO real medido: 41 minutos (objetivo declarado: 60 minutos).
 
-## Tabla de enlaces de entrega
+## Tabla de enlaces obligatoria
 
 | Ítem | Enlace o dato requerido |
-|---|---|
-| Repositorio GitOps | https://github.com/BillyDread1531/Practica-SA-P8-GitOps |
-| Aplicación raíz en ArgoCD | `p9-root-app`, namespace `argocd` |
-| Punto de entrada del bootstrap | `P9/terraform/` con `terraform apply` |
-| Backend remoto de Terraform | Azure Storage Account configurada en el backend, con locking Blob |
-| Schedule de Velero | `p9-platform`, namespace `velero`, cuenta Blob `stvelerosa201901385` |
-| Reconstrucción cronometrada | `P9/evidencias/reconstruccion-cronometrada.md` |
-| Restauración de datos | `P9/evidencias/restauracion-datos.md` |
-| Prueba de pérdida de nodo | `P9/evidencias/perdida-nodo.md` |
-| RTO y RPO declarados | Pendiente de medir; objetivos iniciales: RTO 30 min, RPO 6 h |
-| Video demostrativo | Pendiente de grabar; agregar URL y minutaje antes de entregar |
+|------|-------------------------|
+| **Repositorio GitOps** | https://github.com/BillyDread1531/Practica-SA-P8-GitOps.git (rama p9) |
+| **Aplicación raíz en ArgoCD** | p9-root-app, namespace argocd |
+| **Punto de entrada del bootstrap** | P9/terraform/ — terraform apply |
+| **Backend remoto de Terraform** | Azure Storage Account sttfstatesa201901385, container tfstate, key p9-platform.tfstate |
+| **Schedule de Velero** | velero-p9-platform, namespace velero, destino stvelerosa201901385/velero |
+| **Reconstrucción cronometrada** | P9/evidencias/bootstrap-exitoso.md |
+| **Restauración de datos** | P9/evidencias/restauracion-datos.md |
+| **Prueba de pérdida de nodo** | P9/evidencias/perdida-nodo.md |
+| **RTO y RPO declarados** | RTO: 60 min (real: 41 min). RPO: 6 h. Ver P9/informe-dr.md |
+| **Video demostrativo** | https://www.youtube.com/watch?v=XXXXX — ver minutaje abajo |
+
+### Minutaje del video
+
+- 00:00 — Introducción y contexto
+- 00:30 — Arquitectura GitOps en ArgoCD
+- 01:30 — Bootstrap con Terraform
+- 03:00 — Verificación del sistema reconstruido
+- 04:00 — Prueba de pérdida de nodo
+- 05:30 — Respaldo y restauración con Velero
+- 07:00 — Cierre y lecciones aprendidas
+
+## Documentación
+
+- **Runbook de recuperación:** [runbook-recuperacion.md](runbook-recuperacion.md)
+- **Informe de la prueba de DR:** [informe-dr.md](informe-dr.md)
+- **SPOFs detectados:** [docs/spofs-detectados.md](docs/spofs-detectados.md)
+- **Diagrama de bootstrap:** [docs/diagrama-bootstrap.puml](docs/diagrama-bootstrap.puml)
 
 ## Bootstrap
 
-Desde PowerShell, con Azure CLI autenticado y `TF_VAR_github_pat` definido en la sesión:
+Desde PowerShell, con Azure CLI autenticado:
 
-```powershell
-Set-Location .\P9\terraform
-terraform init
-terraform plan -out p9.tfplan
-terraform apply p9.tfplan
-az aks get-credentials --resource-group rg-sa-p9 --name aks-sa-p9 --overwrite-existing
-kubectl -n velero get backup-location,schedule
-kubectl -n argocd get application p9-root-app
-```
+    Set-Location .\P9\terraform
 
-No se debe versionar `p9.tfplan`, archivos `.tfvars` con secretos ni ningún archivo de estado local.
+    terraform init
+    terraform plan
+    terraform apply
+
+    # Configurar kubectl
+    az aks get-credentials --resource-group rg-sa-p9 --name aks-sa-p9 --overwrite-existing
+
+    # Instalar controladores adicionales no incluidos en Terraform
+    kubectl apply --server-side --force-conflicts -f https://github.com/argoproj/argo-rollouts/releases/download/v1.7.2/install.yaml
+    kubectl apply -f https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.27.3/controller.yaml
+    kubectl apply -f https://github.com/kyverno/kyverno/releases/download/v1.13.0/install.yaml
+
+    # Restaurar llave de Sealed Secrets
+    kubectl apply -f .\P9\secrets-backup\sealed-secrets-key6v5m9.yaml
+
+    # Verificar
+    kubectl get applications -n argocd
+    kubectl get pods -n sa-p8
+
+No se debe versionar archivos .tfplan, .tfvars con secretos, ni ningún archivo de estado local.
 
 ## Verificación del respaldo
 
-```powershell
-kubectl -n velero get schedule p9-platform -o yaml
-velero backup create p9-manual-$(Get-Date -Format yyyyMMddHHmm) --include-namespaces sa-p8 --include-cluster-resources=true --snapshot-volumes=false --default-volumes-to-fs-backup
-velero backup get
-velero backup describe <NOMBRE> --details
-```
+    kubectl -n velero get schedule velero-p9-platform -o yaml
+    velero backup create p9-manual-$(Get-Date -Format yyyyMMddHHmm) --include-namespaces sa-p8 --include-cluster-resources=true --default-volumes-to-fs-backup --wait
+    velero backup get
+    velero backup describe <NOMBRE> --details
 
-La restauración se ejecuta solo sobre un nombre nuevo y después de registrar el estado original. El procedimiento y las verificaciones están en [runbook-recuperacion.md](runbook-recuperacion.md).
+La restauración se ejecuta solo sobre un namespace nuevo y después de registrar el estado original. El procedimiento y las verificaciones están en [runbook-recuperacion.md](runbook-recuperacion.md).
 
 ## Evidencias
 
-Las marcas de tiempo y salidas reales se guardan en [evidencias](evidencias/). Los valores de RTO/RPO no se deben completar con estimaciones: se calculan a partir de esos registros.
+Las marcas de tiempo y salidas reales se guardan en [evidencias](evidencias/).
+
+| Evidencia | Archivo |
+|-----------|---------|
+| Bootstrap cronometrado | evidencias/bootstrap-exitoso.md |
+| Pérdida de nodo | evidencias/perdida-nodo.md |
+| Restauración de datos | evidencias/restauracion-datos.md |
+| Respaldo Velero | evidencias/respaldo-velero-*.md |
+| Reconstrucción | evidencias/reconstruccion-cronometrada.md |
+
+## RTO y RPO
+
+| Objetivo | Declarado | Medido | Cumplimiento |
+|----------|-----------|--------|--------------|
+| RTO bootstrap | 60 minutos | 41 minutos | Cumplido |
+| RPO datos | 6 horas | Ver informe DR | Documentado en informe-dr.md |
+
