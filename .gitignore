@@ -1,4 +1,93 @@
+﻿# ============================================================
+# .gitignore - Practicas Software Avanzado
+# ============================================================
 
+# --- Terraform ---
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+*.tfstate.bak-*
+.terraform.lock.hcl
+crash.log
+crash.*.log
+*.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# --- Backups de archivos .tf ---
+*.tf.bak-*
+*.tf.backup-*
+
+# --- Kubernetes / Helm ---
+*.kubeconfig
+kubeconfig
 P6/charts/sa-platform/values-secret.yaml
-# P8 generated Helm render
 /P8/helm-dev-rendered.yaml
+
+# --- Secrets y credenciales ---
+*.pem
+*.key
+*.crt
+*.pfx
+secrets.yaml
+secrets.yml
+sealed-secrets-key*.yaml
+*.secret.yaml
+
+# --- Velero / backups locales ---
+/velero-backups/
+*.tar.gz
+*.tgz.bak-*
+
+# --- Docker ---
+*.dockerignore
+
+# --- Windows / PowerShell ---
+Thumbs.db
+desktop.ini
+*.lnk
+
+# --- Archivos sueltos generados por pruebas ---
+/Dockerfile•
+/Set-Location
+/app-patch.yaml
+/p8.conf
+/d
+/reporte_p8_*.txt
+/resultados_p8.csv
+/Dockerfile
+/Fix_Script_p8.sh
+/verificar_p8.sh
+/p8.conf
+/Practica_8_2S2026.md
+
+# --- Evidencias temporales (empiezan con guion bajo) ---
+P9/evidencias/_*.txt
+P9/evidencias/_*.md
+
+# --- Node / builds ---
+node_modules/
+dist/
+build/
+target/
+*.log
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*~
+
+# --- Practicas previas (no tocar P5-P7) ---
+P5/node_modules/
+P6/node_modules/
+P7/node_modules/
+
+# --- Repo GitOps clonado localmente (untracked) ---
+/P8-GitOps/
