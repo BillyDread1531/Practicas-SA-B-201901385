@@ -25,6 +25,7 @@ spec:
   template:
     metadata:
       labels:
+        app.kubernetes.io/instance: sa-platform-dev
         app.kubernetes.io/name: cursos-service
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
