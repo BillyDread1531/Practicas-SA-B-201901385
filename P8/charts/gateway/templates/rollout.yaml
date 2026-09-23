@@ -72,11 +72,11 @@ spec:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
             - weight: 100
-              labelSelector:
-                matchLabels:
-                  {{- include "gateway.selectorLabels" . | nindent 18 }}
-              topologyKey: kubernetes.io/hostname
-
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    {{- include "gateway.selectorLabels" . | nindent 18 }}
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: gateway
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

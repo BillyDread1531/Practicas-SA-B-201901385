@@ -43,11 +43,11 @@ spec:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
             - weight: 100
-              labelSelector:
-                matchLabels:
-                  {{- include "inscripciones-service.selectorLabels" . | nindent 18 }}
-              topologyKey: kubernetes.io/hostname
-
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    {{- include "inscripciones-service.selectorLabels" . | nindent 18 }}
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: inscripciones-service
 
