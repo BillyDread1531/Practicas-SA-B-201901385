@@ -1,0 +1,85 @@
+﻿@startuml
+!theme plain
+title Orden de reconstruccion - Practica 9
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+
+package "FASE 1 - Manual (5 min)" as fase1 #FFE6E6 {
+  rectangle "1. az login" as step1
+  rectangle "2. terraform init" as step2
+  rectangle "3. terraform apply" as step3
+}
+
+package "FASE 2 - Automatico Terraform (15 min)" as fase2 #E6F3FF {
+  rectangle "4. Crear Resource Group rg-sa-p9" as step4
+  rectangle "5. Crear Cluster AKS aks-sa-p9" as step5
+  rectangle "6. Configurar rol AcrPull" as step6
+  rectangle "7. Instalar ArgoCD via Helm" as step7
+  rectangle "8. Instalar Velero via Helm" as step8
+  rectangle "9. Crear Storage Account Velero" as step9
+  rectangle "10. Aplicar app-of-apps p9-root-app" as step10
+  rectangle "11. Crear credenciales repos GitOps" as step11
+}
+
+package "FASE 3 - Automatico ArgoCD (30 min)" as fase3 #E6FFE6 {
+  rectangle "12. ArgoCD lee p9-root-app" as step12
+  rectangle "13. Descubre sa-platform-dev" as step13
+  rectangle "14. Aplica Helm chart sa-platform" as step14
+  rectangle "15. Despliega microservicios" as step15
+  rectangle "16. Aplica Kyverno policies" as step16
+  rectangle "17. Sincroniza SealedSecret" as step17
+}
+
+package "FASE 4 - Manual verificacion (10 min)" as fase4 #FFF6E6 {
+  rectangle "18. kubectl get nodes" as step18
+  rectangle "19. kubectl get applications" as step19
+  rectangle "20. Verificar gateway /health" as step20
+  rectangle "21. Verificar SELECT en PostgreSQL" as step21
+}
+
+step1 --> step2
+step2 --> step3
+step3 --> step4
+step4 --> step5
+step5 --> step6
+step6 --> step7
+step7 --> step8
+step8 --> step9
+step9 --> step10
+step10 --> step11
+step11 --> step12
+step12 --> step13
+step13 --> step14
+step14 --> step15
+step15 --> step16
+step16 --> step17
+step17 --> step18
+step18 --> step19
+step19 --> step20
+step20 --> step21
+
+note right of fase1
+  Requiere operador humano
+  RTO inicio: 00:00
+end note
+
+note right of fase2
+  Automatico por Terraform
+  Dependencias: AKS antes que ArgoCD
+  ArgoCD antes que Velero
+end note
+
+note right of fase3
+  Automatico por ArgoCD selfHeal
+  Dependencias: p9-root-app antes que sa-platform-dev
+  Sin intervencion manual
+end note
+
+note right of fase4
+  Verificacion manual obligatoria
+  RTO fin: 01:00 (60 min)
+end note
+
+@enduml
