@@ -134,3 +134,38 @@ Mitigación pendiente: crear PodVolumeRestore manualmente o usar Velero CLI con 
 
 **Conclusión:** Las pruebas de pérdida de nodo y de recreación de Deployments fueron exitosas. La prueba de restauración de datos reveló una limitación conocida de Velero + Kopia que requiere intervención manual. El sistema es recuperable pero requiere conocimiento técnico específico para el restore de datos.
 
+
+---
+
+## Adenda: Limitación detectada en el restore de datos
+
+Durante la ejecución de la Prueba 2 (restauración de datos), se detectó una limitación específica del stack Velero + Kopia que impide el restore automático de datos:
+
+**Comportamiento observado:**
+
+1. El backup se completa exitosamente (`Completed`, 0 errores).
+2. Los PodVolumeBackups de Kopia se generan con el snapshotID correcto.
+3. El restore recrea el PVC y lo deja en estado Bound.
+4. Sin embargo, los datos NO se inyectan al PVC.
+5. PostgreSQL detecta el PVC vacío y ejecuta initdb, creando una base de datos limpia.
+
+**Causa raíz:**
+
+Velero crea los recursos `PodVolumeRestore` automáticamente solo cuando el pod destino existe en el namespace al momento del restore. Si el namespace no tiene pods corriendo, el restore completa sin inyectar datos de Kopia.
+
+Los intentos manuales de crear `PodVolumeRestore` no funcionaron porque el controller de Velero no los asigna al node-agent correcto sin pasar por su flujo interno de restauración.
+
+**Impacto:**
+
+Los datos están a salvo en Azure Blob Storage (verificado con PodVolumeBackup `Completed`), pero requieren un procedimiento más complejo para restaurarse.
+
+**Procedimiento correcto identificado (no probado por tiempo):**
+
+1. Restaurar en el MISMO namespace donde el pod productivo está corriendo.
+2. Velero detecta el pod existente y crea PodVolumeRestore automáticamente.
+3. Escalar el StatefulSet a 0, borrar el PVC, restaurar, escalar a 1.
+
+**Recomendación:**
+
+Documentar este procedimiento en el runbook y probarlo en una sesión futura.
+
