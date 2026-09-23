@@ -91,3 +91,19 @@ P7/node_modules/
 
 # --- Repo GitOps clonado localmente (untracked) ---
 /P8-GitOps/
+
+# --- Basura suelta de P4, P7 ---
+/P4/README.md
+/P7/evidencias/*.png.png
+
+# --- Backups de archivos en subdirectorios ---
+**/*.bak-*
+**/*.backup-*
+
+# --- Backups de secretos (nunca al repo) ---
+/P9/secrets-backup/
+**/secrets-backup/
+
+# --- Archivos sueltos generados por pruebas (nombre raro) ---
+/Dockerfile*[!a-zA-Z0-9._-]*
+/Dockerfile*
