@@ -1,4 +1,4 @@
-apiVersion: apps/v1
+﻿apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "auth-service.fullname" . }}
@@ -41,8 +41,9 @@ spec:
 
       affinity:
         podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              labelSelector:
                 matchLabels:
                   {{- include "auth-service.selectorLabels" . | nindent 18 }}
               topologyKey: kubernetes.io/hostname

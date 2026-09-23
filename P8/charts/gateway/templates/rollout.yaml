@@ -1,4 +1,4 @@
-{{- $global := .Values.global | default (dict) -}}
+﻿{{- $global := .Values.global | default (dict) -}}
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 
@@ -70,8 +70,9 @@ spec:
 
       affinity:
         podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              labelSelector:
                 matchLabels:
                   {{- include "gateway.selectorLabels" . | nindent 18 }}
               topologyKey: kubernetes.io/hostname
