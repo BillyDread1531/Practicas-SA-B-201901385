@@ -20,9 +20,16 @@ spec:
       exclude:
         any:
           - resources:
+              kinds:
+                - Pod
+                - DaemonSet
+                - Deployment
+                - Job
               namespaces:
                 - argocd
                 - kyverno
+                - velero
+                - argo-rollouts
       validate:
         message: "Los contenedores deben ejecutarse como usuario no root."
         foreach:

@@ -39,6 +39,14 @@ spec:
         seccompProfile:
           type: RuntimeDefault
 
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  {{- include "auth-service.selectorLabels" . | nindent 18 }}
+              topologyKey: kubernetes.io/hostname
+
       containers:
         - name: auth-service
 

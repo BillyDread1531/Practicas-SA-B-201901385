@@ -20,9 +20,16 @@ spec:
       exclude:
         any:
           - resources:
+              kinds:
+                - Pod
+                - DaemonSet
+                - Deployment
+                - Job
               namespaces:
                 - argocd
                 - kyverno
+                - velero
+                - argo-rollouts
       validate:
         message: "Cada contenedor debe definir requests y limits de CPU y memoria."
         foreach:

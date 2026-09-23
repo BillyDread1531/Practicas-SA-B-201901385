@@ -1,0 +1,81 @@
+================================================================
+ VERIFICACION PRACTICA 8 - v2.0
+ Carnet: 202012345        Fecha: 2026-09-17 23:49
+ Hash del script: b7d118f15b7d9b1c
+================================================================
+
+--- 0. Herramientas y contexto (debe verificarlo el auxiliar)
+  [0;33m[AVISO][0m Herramientas ausentes: jq trivy cosign argocd kubectl-argo-rollouts  (sus verificaciones saldran en cero)
+  Contexto de kubectl : aks-sa-p6
+  Servidor            : Kubernetes control plane is running at https://aks-sa-p6-rg-sa-p6-6a3aef-ktvxz0s8.hcp.centralus.azmk8s.io:443
+  Usuario de ArgoCD   : sin sesion
+  [0;32m[OK][0m    Acceso al cluster confirmado
+
+--- 1. Repositorios
+  [0;31m[FALLA][0m Repositorio de codigo INACCESIBLE: https://github.com/usuario/software-avanzado
+  [0;31m[FALLA][0m Repositorio GitOps INACCESIBLE: https://github.com/usuario/software-avanzado-gitops
+  [0;31m[FALLA][0m No existe la carpeta /P8
+  [0;31m[FALLA][0m README de entrega AUSENTE
+
+--- ELIMINATORIO: ausencia de despliegue directo (seccion 8.1)
+  [0;31m[FALLA][0m No existe .github/workflows en el repositorio de codigo
+
+--- 2.1 Infraestructura como codigo con Terraform (8 pts)
+  [0;31m[FALLA][0m Sin codigo Terraform en el repositorio
+  >> 2.1 = 0 / 8
+
+--- 2.2 Empaquetado con Helm (8 pts)
+  [0;31m[FALLA][0m Sin charts de Helm
+  >> 2.2 = 0 / 8
+
+--- 2.3 GitOps con ArgoCD (14 pts)
+  [0;31m[FALLA][0m No se pudo obtener la aplicacion 'mi-app-prod' (ni por argocd ni por kubectl)
+  [0;31m[FALLA][0m No se evidencia actualizacion de version mediante Pull Request
+  >> 2.3 = 0 / 14
+
+--- 2.4 Entrega progresiva y reversion automatica (14 pts)
+  [0;31m[FALLA][0m No existe ningun Rollout en el namespace 'produccion'
+  >> 2.4 = 0 / 14
+
+--- 2.5 Validacion automatizada (8 pts)
+  [0;31m[FALLA][0m Sin prueba de carga (k6 o Locust)
+  [0;31m[FALLA][0m Sin umbrales de error o latencia
+  [0;31m[FALLA][0m Sin pruebas de humo
+  [0;31m[FALLA][0m El analisis no invoca pruebas reales
+  >> 2.5 = 0 / 8
+
+--- 2.6 Cadena de suministro y politicas (8 pts)
+  [0;31m[FALLA][0m Trivy ausente o sin capacidad de bloqueo
+  [0;31m[FALLA][0m Imagen sin firma valida (o registro privado sin docker login)
+  [0;33m[AVISO][0m Reintente a mano: cosign verify ghcr.io/usuario/orders:1.4.2 --certificate-identity-regexp 'https://github.com/usuario/software-avanzado/.*' --certificate-oidc-issuer https://token.actions.githubusercontent.com
+  Politicas activas: 3
+  [0;32m[OK][0m    Tres o mas politicas activas
+  [0;31m[FALLA][0m Sin SealedSecrets ni ExternalSecrets
+  [0;32m[OK][0m    Sin secretos en texto plano
+  >> 2.6 = 3 / 8
+
+--- Antipatrones (informativo, penalizacion manual)
+  [0;32m[OK][0m    Sin uso de la etiqueta latest
+  [0;31m[FALLA][0m Sin limites de recursos declarados
+
+================================================================
+ RESUMEN - carnet 202012345
+================================================================
+  2.1 Terraform ..............  0 / 8
+  2.2 Helm ...................  0 / 8
+  2.3 GitOps con ArgoCD ......  0 / 14
+  2.4 Entrega progresiva .....  0 / 14
+  2.5 Validacion automatizada   0 / 8
+  2.6 Seguridad y politicas ..  3 / 8
+  ------------------------------------
+  CONOCIMIENTO ...............  3 / 60
+
+  Pendiente de evaluacion presencial: 40 pts
+    1.1 Documentacion (8)   1.2 Diagrama (8)
+    1.3 Informe de incidente (10)   1.4 Preguntas teoricas (14)
+
+  [0;31mREQUISITOS ELIMINATORIOS INCUMPLIDOS:[0m repo-codigo repo-gitops readme sin-workflows sin-app-argocd sin-rollout
+  Revisar la seccion 8.1 del enunciado antes de asignar nota.
+
+  Duracion: 12s    Reporte: reporte_p8_202012345.txt
+================================================================

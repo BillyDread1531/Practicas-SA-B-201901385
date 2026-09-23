@@ -39,6 +39,14 @@ spec:
         seccompProfile:
           type: RuntimeDefault
 
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  {{- include "cursos-service.selectorLabels" . | nindent 18 }}
+              topologyKey: kubernetes.io/hostname
+
       containers:
         - name: cursos-service
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

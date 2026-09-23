@@ -63,7 +63,7 @@ resource "kubernetes_resource_quota" "sa_p8" {
     hard = {
       "requests.cpu"           = "2"
       "requests.memory"        = "2Gi"
-      "limits.cpu"             = "4"
+      "limits.cpu"             = "6"
       "limits.memory"          = "4Gi"
       "pods"                   = "30"
       "persistentvolumeclaims" = "5"
@@ -219,3 +219,4 @@ output "role_bindings" {
     binding.metadata[0].name
   ]
 }
+

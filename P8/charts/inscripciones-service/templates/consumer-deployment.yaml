@@ -36,6 +36,14 @@ spec:
         seccompProfile:
           type: RuntimeDefault
 
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: inscripciones-consumer
+              topologyKey: kubernetes.io/hostname
+
       containers:
         - name: consumer
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

@@ -8,7 +8,7 @@ consumer:
 
 image:
   repository: acrsa201901385.azurecr.io/inscripciones-service
-  tag: "p6"
+  tag: "51cfc6bb05adaad0fa541395046daf466f545821"
   pullPolicy: IfNotPresent
 
 fullnameOverride: "inscripciones-service"
@@ -32,7 +32,7 @@ secret:
   name: "sa-platform-secrets"
 
 serviceAccount:
-  create: false
+  create: true
   name: "inscripciones-sa"
 
 autoscaling:

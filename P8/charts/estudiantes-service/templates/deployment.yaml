@@ -39,6 +39,14 @@ spec:
         seccompProfile:
           type: RuntimeDefault
 
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  {{- include "estudiantes-service.selectorLabels" . | nindent 18 }}
+              topologyKey: kubernetes.io/hostname
+
       containers:
         - name: estudiantes-service
 
