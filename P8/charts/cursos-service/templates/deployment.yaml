@@ -20,12 +20,12 @@ spec:
 
   selector:
     matchLabels:
-      {{- include "cursos-service.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: cursos-service
 
   template:
     metadata:
       labels:
-        {{- include "cursos-service.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: cursos-service
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
 
@@ -46,7 +46,7 @@ spec:
               podAffinityTerm:
                 labelSelector:
                   matchLabels:
-                    {{- include "cursos-service.selectorLabels" . | nindent 18 }}
+                    app.kubernetes.io/name: cursos-service
                 topologyKey: kubernetes.io/hostname
       containers:
         - name: cursos-service

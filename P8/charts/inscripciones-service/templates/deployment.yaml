@@ -19,12 +19,12 @@ spec:
 
   selector:
     matchLabels:
-      {{- include "inscripciones-service.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: inscripciones-service
 
   template:
     metadata:
       labels:
-        {{- include "inscripciones-service.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: inscripciones-service
 
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
@@ -46,7 +46,7 @@ spec:
               podAffinityTerm:
                 labelSelector:
                   matchLabels:
-                    {{- include "inscripciones-service.selectorLabels" . | nindent 18 }}
+                    app.kubernetes.io/name: inscripciones-service
                 topologyKey: kubernetes.io/hostname
       containers:
         - name: inscripciones-service

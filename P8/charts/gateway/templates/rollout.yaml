@@ -17,7 +17,7 @@ spec:
 
   selector:
     matchLabels:
-      {{- include "gateway.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: gateway
 
   strategy:
     canary:
@@ -54,7 +54,7 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "gateway.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: gateway
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
 
@@ -75,7 +75,7 @@ spec:
               podAffinityTerm:
                 labelSelector:
                   matchLabels:
-                    {{- include "gateway.selectorLabels" . | nindent 18 }}
+                    app.kubernetes.io/name: gateway
                 topologyKey: kubernetes.io/hostname
       containers:
         - name: gateway
