@@ -1,262 +1,273 @@
-﻿# Runbook de Recuperación ante Desastres
+# Runbook de recuperación ante desastres — Práctica 9
 
-**Práctica:** 9 — Continuidad operativa y recuperación ante desastres
-**Cluster:** aks-sa-p9 (resource group: rg-sa-p9)
-**Namespace de aplicación:** sa-p8
-**Repositorio GitOps:** https://github.com/BillyDread1531/Practica-SA-P8-GitOps.git (rama p9)
-**Repositorio de código:** https://github.com/BillyDread1531/Practicas-SA-B-201901385.git (rama main)
+**Para quién:** una persona que **no conoce el sistema** y no tiene acceso a quien lo construyó. Todo lo necesario está en
+este documento y en el repositorio. Cada paso trae el comando exacto, lo que debe ver y qué hacer si no lo ve.
 
----
+**Objetivos declarados:** RTO **60 min** · RPO **6 h** (respaldos cada 6 h).
+**Tiempo medido de la reconstrucción completa:** ver [evidencias/reconstruccion-cronometrada.md](evidencias/reconstruccion-cronometrada.md).
 
-## Propósito
+## 0. ¿Qué escenario tengo?
 
-Este documento describe el procedimiento completo para reconstruir el ecosistema de microservicios desde cero ante la pérdida total del clúster o de los datos. Está diseñado para ser ejecutado por una persona que no conoce el sistema, sin acceso al autor original.
+| Síntoma | Escenario | Ir a |
+|---|---|---|
+| `kubectl` no conecta, el clúster `aks-sa-p9` ya no existe o está irrecuperable | **A. Pérdida total del clúster** | §3 |
+| El clúster funciona pero faltan/están corruptos los datos de PostgreSQL o RabbitMQ | **B. Pérdida de datos** | §4 |
+| Un nodo está `NotReady` o hay que darlo de baja | **C. Pérdida de un nodo** | §5 |
+| Pods de la aplicación en `CreateContainerConfigError` / el `SealedSecret` no se descifra | **D. Secretos ilegibles** | §6 |
+| Nunca se ha instalado nada (entorno vacío) | **Preparación inicial** | §7 |
 
-**Objetivos declarados:**
-- **RTO (Recovery Time Objective):** 60 minutos
-- **RPO (Recovery Point Objective):** 6 horas (intervalo del schedule de Velero)
+## 1. Prerrequisitos (verificar ANTES de empezar)
 
----
+Herramientas instaladas en la máquina del operador (PowerShell 5.1 o `pwsh` 7):
 
-## Prerrequisitos
+| Herramienta | Versión probada | Comprobación |
+|---|---|---|
+| Azure CLI | 2.6x o superior | `az version` |
+| Terraform | ≥ 1.6 (probado 1.16) | `terraform version` |
+| kubectl | ≥ 1.30 | `kubectl version --client` |
+| Git | cualquiera | `git --version` |
 
-Antes de comenzar, verificar que se cuenta con:
+Cuenta de Azure con estos permisos sobre la suscripción (rol **Owner** los cubre; con menos se necesitan los tres):
 
-1. **Acceso a Azure CLI:** az login autenticado con permisos de Contributor.
-2. **Acceso al clúster:** kubectl configurado con el contexto aks-sa-p9.
-3. **Terraform instalado:** versión mayor o igual a 1.16.0.
-4. **Helm instalado:** versión mayor o igual a 3.14.
-5. **Acceso al repositorio de código:** clonado localmente.
-6. **Token de GitHub:** con permisos de lectura.
+- **Contributor** (crear AKS, resource group, Storage).
+- **User Access Administrator** (Terraform crea el rol `AcrPull` para el clúster sobre el ACR `acrsa201901385`).
+- **Key Vault Secrets User** sobre `kv-p9-201901385` y **Storage Blob Data Contributor** sobre `sttfstatesa201901385`
+  (leer las llaves de Sealed Secrets y el estado remoto de Terraform).
 
----
-
-## Estructura del sistema
-
-| Recurso | Tipo | Resource Group | Región |
-|---------|------|----------------|--------|
-| rg-sa-p9 | Resource Group principal | — | eastus |
-| aks-sa-p9 | Cluster AKS | rg-sa-p9 | eastus |
-| rg-sa-p9-backend | Resource Group del backend Terraform | — | eastus |
-| sttfstatesa201901385 | Storage Account del tfstate | rg-sa-p9-backend | eastus |
-| stvelerosa201901385 | Storage Account de Velero | rg-sa-p9 | eastus |
-| acrsa201901385 | Azure Container Registry | rg-sa-p6 | centralus |
-
----
-
-## Escenario 1: Reconstrucción completa desde cero
-
-**Cuándo usar:** Cuando se pierde el clúster completo.
-**Tiempo estimado:** 60 minutos.
-
-### Paso 1: Verificar el estado de Azure
-
+```powershell
 az login
-az account show
-az group list --query "[].name" -o table
+az account show --query "{usuario:user.name, suscripcion:name}" -o table
+git clone https://github.com/BillyDread1531/Practicas-SA-B-201901385.git
+cd Practicas-SA-B-201901385\P9
+```
 
-**Verificación:** Debe mostrar los resource groups rg-sa-p9, rg-sa-p9-backend y rg-sa-p6.
+**Verifique que la capa persistente sobrevive** (si esto falla, vaya a §8 «Límites»):
 
+```powershell
+az group exists --name rg-sa-p9-backend                       # debe imprimir: true
+az keyvault secret show --vault-name kv-p9-201901385 --name sealed-secrets-keys --query "length(value)" -o tsv   # un numero > 2
+az storage blob list --account-name sttfstatesa201901385 --container-name tfstate --auth-mode login --query "[].name" -o tsv   # debe listar p9-platform.tfstate
+$k = az storage account keys list --account-name stp9velero201901385 -g rg-sa-p9-backend --query "[0].value" -o tsv
+az storage blob list --account-name stp9velero201901385 --account-key $k --container-name velero --prefix backups/ --query "length(@)" -o tsv   # > 0 (hay respaldos)
+```
 
-### Paso 2: Verificar el backend remoto de Terraform
+## 2. Datos fijos del sistema
 
-az storage blob list `
-    --account-name sttfstatesa201901385 `
-    --container-name tfstate `
-    --auth-mode login `
-    --query "[].name" -o table
-
-**Verificación:** Debe aparecer p9-platform.tfstate.
-
-### Paso 3: Reconstruir la infraestructura con Terraform
-
-Este es el punto de entrada único del bootstrap.
-
-cd "C:\Users\billy\OneDrive\Escritorio\SOTFWARE AVANZADO\PRACTICA 1\P9\terraform"
-terraform state list
-terraform plan
-terraform apply -auto-approve
-
-**Qué hace:**
-
-1. Crea el resource group rg-sa-p9.
-2. Crea el cluster AKS aks-sa-p9 con 2 nodos ARM64.
-3. Configura el rol AcrPull.
-4. Instala ArgoCD vía Helm.
-5. Instala Velero vía Helm con Azure Blob.
-6. Crea el Storage Account de Velero.
-7. Aplica la app-of-apps p9-root-app.
-8. Crea las credenciales de los repositorios.
-
-**Tiempo esperado:** 15-20 minutos.
-
-
-**Verificación después del bootstrap:**
-
-az aks get-credentials --resource-group rg-sa-p9 --name aks-sa-p9 --overwrite-existing
-kubectl get nodes
-kubectl get pods -n argocd
-kubectl get pods -n velero
-
-**Esperado:** 2 nodos Ready, 6 pods de ArgoCD, 3 pods de Velero.
-
-### Paso 4: Esperar la sincronización de ArgoCD
-
-kubectl get applications -n argocd
-kubectl wait --for=condition=Synced application/sa-platform-dev -n argocd --timeout=600s
-
-**Esperado:** p9-root-app, sa-platform-dev, kyverno, p8-kyverno-policies como Synced.
-
-
-**Verificación después del bootstrap:**
-
-az aks get-credentials --resource-group rg-sa-p9 --name aks-sa-p9 --overwrite-existing
-kubectl get nodes
-kubectl get pods -n argocd
-kubectl get pods -n velero
-
-**Esperado:** 2 nodos Ready, 6 pods de ArgoCD, 3 pods de Velero.
-
-### Paso 4: Esperar la sincronización de ArgoCD
-
-kubectl get applications -n argocd
-kubectl wait --for=condition=Synced application/sa-platform-dev -n argocd --timeout=600s
-
-**Esperado:** p9-root-app, sa-platform-dev, kyverno, p8-kyverno-policies como Synced.
-
-
-### Paso 5: Verificar los microservicios
-
-kubectl get pods -n sa-p8
-kubectl get svc -n sa-p8
-kubectl exec -n sa-p8 (kubectl get pods -n sa-p8 -l app.kubernetes.io/name=gateway -o jsonpath='{.items[0].metadata.name}') -- wget -qO- http://gateway:3000/health
-
-**Esperado:** El gateway responde con status ok.
-
-### Paso 6: Restaurar los secretos (si es necesario)
-
-Si el SealedSecret no se descifra, hay que restaurar la llave de sellado.
-
-az storage blob download `
-    --account-name sttfstatesa201901385 `
-    --container-name sealed-secrets-backup `
-    --name sealed-secrets-key6v5m9.yaml `
-    --file ./sealed-secrets-key.yaml `
-    --auth-mode login
-
-kubectl apply -f ./sealed-secrets-key.yaml
-kubectl rollout restart deployment sealed-secrets-controller -n kube-system
-kubectl get sealedsecret sa-platform-secrets -n sa-p8
-
+| Recurso | Valor |
+|---|---|
+| Suscripción / región | la de `az login` · `eastus` |
+| Clúster / resource group | `aks-sa-p9` / `rg-sa-p9` (se destruye y se recrea) |
+| **Capa persistente** (no se destruye) | resource group `rg-sa-p9-backend`: Storage `sttfstatesa201901385` (estado Terraform), Storage `stp9velero201901385` (respaldos), Key Vault `kv-p9-201901385` (llaves) |
+| Estado remoto de Terraform | backend `azurerm`, contenedor `tfstate`, clave `p9-platform.tfstate` (bloqueo por lease del Blob) |
+| Namespace de la aplicación | `sa-p8` |
+| App raíz de ArgoCD | `p9-root-app`, namespace `argocd` |
+| Repositorio GitOps (público) | https://github.com/BillyDread1531/Practica-SA-P8-GitOps.git, rama `p9` |
+| Schedule de Velero | `velero-p9-platform` (`0 */6 * * *`, retención 720 h), namespace `velero` |
 
 ---
 
-## Escenario 2: Restauración de datos desde Velero
+## 3. Escenario A — Pérdida total del clúster
 
-**Cuándo usar:** Cuando se pierden los datos de PostgreSQL o RabbitMQ pero el clúster sigue funcionando.
+**Un solo comando** reconstruye todo (no hay pasos manuales intermedios):
 
-### Paso 1: Listar backups disponibles
+```powershell
+cd P9
+.\scripts\bootstrap.ps1 -LogFile .\evidencias\mi-recuperacion.log
+```
 
-kubectl get backups -n velero
+Qué hace, en este orden (cada paso imprime una marca de tiempo `| bootstrap: ...`):
 
-### Paso 2: Crear un restore a un namespace separado
+| # | Paso automático | Marca que debe ver | Si no aparece |
+|---|---|---|---|
+| 1 | `terraform init` + `apply` (estado remoto): AKS → ArgoCD → llaves de Sealed Secrets (desde Key Vault) → Velero → `p9-root-app` | `terraform apply COMPLETO` | ver §9 (fila «terraform») |
+| 2 | Espera nodos y ArgoCD | `AKS disponible`, `ArgoCD disponible` | ver §9 |
+| 3 | ArgoCD sincroniza por olas: `sealed-secrets`, `argo-rollouts`, `kyverno` → `p8-kyverno-policies` → `sa-platform-dev` | `app <nombre> Synced` (5 veces) y `p9-root-app Healthy` | ver §9 (fila «app no sincroniza») |
+| 4 | El controlador descifra el SealedSecret con la llave restaurada | `SealedSecret sa-platform-secrets DESCIFRADO` | ir a §6 |
+| 5 | PostgreSQL y RabbitMQ arrancan con volúmenes nuevos (vacíos) | `PostgreSQL y RabbitMQ Ready` | ver §9 |
+| 6 | Restauración de datos desde el último respaldo (`restore-datos.ps1`) | `PodVolumeRestore completados = N/N` y `datos restaurados desde Velero` | ir a §4 |
+| 7 | Verificación (`verificar.ps1`) | `RESULTADO = todos los controles PASS` | leer el control `FAIL` y ver §9 |
 
-apiVersion: velero.io/v1
-kind: Restore
+**Verificación manual final (2 minutos):**
+
+```powershell
+kubectl get nodes                                   # 2 nodos Ready
+kubectl get applications -n argocd                  # p9-root-app y las 5 hijas: Synced
+kubectl get pods -n sa-p8                           # todo Running (los cron-* aparecen Completed)
+kubectl -n sa-p8 get sealedsecret sa-platform-secrets -o jsonpath='{.status.conditions[0].type}={.status.conditions[0].status}'   # Synced=True
+$ip = kubectl -n sa-p8 get svc gateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+curl.exe -s "http://${ip}:3000/health"              # {"status":"ok","service":"gateway"}
+```
+
+Comprobar los datos (no solo que el pod arranque): la base debe tener las filas que tenía en el último respaldo.
+
+```powershell
+# (la clave se lee dentro del pod; no se imprime)
+"select count(*) from estudiantes; select count(*) from usuarios;" | kubectl -n sa-p8 exec -i postgresql-0 -c postgresql -- bash -c 'export PGPASSWORD=$(cat /opt/bitnami/postgresql/secrets/postgres-password); psql -U postgres -d academia -At'
+```
+
+**Si `bootstrap.ps1` se interrumpe** (cierre de sesión, corte de red): vuelva a ejecutarlo. Es idempotente:
+Terraform continúa desde el estado remoto y `restore-datos.ps1` vuelve a restaurar el último respaldo.
+Si Terraform quedó con el bloqueo tomado: `terraform -chdir=terraform force-unlock <ID que muestra el error>`.
+
+**Primera instalación** (Key Vault vacío): `bootstrap.ps1` lo detecta, no hay respaldos que restaurar y guarda solo la
+llave del controlador en el Key Vault al terminar.
+
+---
+
+## 4. Escenario B — Pérdida de datos con el clúster funcionando
+
+```powershell
+cd P9
+kubectl -n velero get backup -l velero.io/schedule-name=velero-p9-platform    # elegir uno en fase Completed
+.\scripts\restore-datos.ps1                         # usa el ultimo respaldo Completed del schedule
+# o uno concreto:
+.\scripts\restore-datos.ps1 -BackupName velero-p9-platform-20260924060026
+```
+
+El script hace, sin intervención: (1) pausa GitOps (`p9-root-app` y `sa-platform-dev`, si no ArgoCD recrearía volúmenes
+vacíos), (2) borra el StatefulSet y el PVC de PostgreSQL y RabbitMQ, (3) crea un `Restore` de Velero limitado a
+`statefulsets, pods, persistentvolumeclaims, persistentvolumes` con esos dos selectores, (4) espera los
+`PodVolumeRestore` y que `postgresql-0`/`rabbitmq-0` queden `Ready`, (5) reactiva GitOps.
+
+**Debe ver:** `Restore ... -> Completed`, `PodVolumeRestore completados = 5/5`, `postgresql-0 Ready con el volumen restaurado`.
+Luego verifique el contenido con el `select` del §3. Datos insertados después del respaldo elegido **no** se recuperan
+(ese es el RPO).
+
+**Importante — no restaure solo los PVC.** Velero repone los datos con un initContainer (`restore-wait`) que inyecta en
+el *pod* restaurado. Sin pod restaurado no hay `PodVolumeRestore` y el volumen queda vacío. Además la política Kyverno
+`p8-require-non-root` debe eximir a ese initContainer (ya está en el repositorio; si alguien la revierte, el pod se rechaza).
+
+Comandos manuales equivalentes (si el script no pudiera usarse):
+
+```powershell
+kubectl -n argocd patch application p9-root-app --type merge -p '{"spec":{"syncPolicy":{"automated":null}}}'
+kubectl -n argocd patch application sa-platform-dev --type merge -p '{"spec":{"syncPolicy":{"automated":null}}}'
+kubectl -n sa-p8 delete statefulset postgresql rabbitmq
+kubectl -n sa-p8 delete pvc data-postgresql-0 data-rabbitmq-0
+velero restore create restore-manual --from-backup <BACKUP> --include-namespaces sa-p8 `
+  --include-resources statefulsets,pods,persistentvolumeclaims,persistentvolumes `
+  --or-selector app.kubernetes.io/name=postgresql --or-selector app.kubernetes.io/name=rabbitmq --wait
+kubectl -n velero get podvolumerestore                     # todos Completed
+kubectl -n argocd patch application p9-root-app --type merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'
+```
+
+(en PowerShell 5.1 las comillas dobles internas de `-p` se pierden: use `scripts/restore-datos.ps1`, que aplica los parches por archivo).
+
+---
+
+## 5. Escenario C — Pérdida de un nodo
+
+No requiere reconstrucción: los Deployments, el Rollout y los PDB reprograman los pods en el nodo restante.
+
+```powershell
+kubectl get nodes -o wide
+kubectl drain <NODO> --ignore-daemonsets --delete-emptydir-data --timeout=300s     # si hay que darlo de baja
+kubectl -n sa-p8 get pods -o wide                        # los pods deben quedar Running en el nodo restante
+kubectl uncordon <NODO>                                  # cuando el nodo vuelva
+```
+
+**Qué esperar (medido):** los 5 microservicios siguen respondiendo sin errores. **PostgreSQL tiene una sola réplica**: si el
+nodo drenado es el que lo aloja, las rutas que usan base de datos devuelven 5xx unos ~60 s hasta que el pod se reprograma
+y el disco se re-adjunta (ver [evidencias/perdida-nodo.md](evidencias/perdida-nodo.md), escenario B). No es una falla a
+reparar: es el comportamiento conocido, documentado como brecha en el informe.
+
+Prueba reproducible con evidencia: `.\scripts\prueba-perdida-nodo.ps1 -Scenario stateless` (o `stateful`).
+
+---
+
+## 6. Escenario D — Secretos ilegibles (Sealed Secrets)
+
+Síntoma:
+
+```powershell
+kubectl -n sa-p8 get sealedsecret sa-platform-secrets -o jsonpath='{.status.conditions[0].message}'
+# "no key could decrypt secret" -> el controlador no tiene la llave con la que se cifro el SealedSecret
+```
+
+Causa: el controlador arrancó **antes** de que existiera la llave restaurada y generó una nueva. Solución (restaurar las
+llaves del Key Vault y reiniciar el controlador):
+
+```powershell
+$json = az keyvault secret show --vault-name kv-p9-201901385 --name sealed-secrets-keys --query value -o tsv | ConvertFrom-Json
+foreach ($k in $json) {
+@"
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/tls
 metadata:
-  name: restore-dr
-  namespace: velero
-spec:
-  backupName: nombre-del-backup
-  includedNamespaces:
-    - sa-p8
-  namespaceMapping:
-    sa-p8: sa-p8-restore
-  includedResources:
-    - persistentvolumeclaims
-    - persistentvolumes
-  restorePVs: true
+  name: $($k.name)
+  namespace: kube-system
+  labels:
+    sealedsecrets.bitnami.com/sealed-secrets-key: active
+data:
+  tls.crt: $($k.crt)
+  tls.key: $($k.key)
+"@ | kubectl apply -f -
+}
+kubectl -n kube-system rollout restart deployment sealed-secrets-controller
+kubectl -n kube-system rollout status deployment sealed-secrets-controller
+kubectl -n sa-p8 get sealedsecret sa-platform-secrets -o jsonpath='{.status.conditions[0].status}'   # True
+```
 
-### Paso 3: Verificar la restauración
+(No imprima la variable `$json`: contiene llaves privadas.)
 
-kubectl get restore restore-dr -n velero
-kubectl get pvc -n sa-p8-restore
+**Si la llave se perdió también del Key Vault** los `SealedSecret` del repositorio son irrecuperables. Hay que crear los
+secretos de nuevo y volver a sellarlos con el certificado del controlador nuevo:
 
-**Limitación conocida:** El restore de Velero recupera la definición del PVC pero no inyecta los datos de Kopia automáticamente. Para restaurar los datos reales es necesario crear un PodVolumeRestore manualmente o usar la CLI de Velero con el flag --restore-volumes.
+```powershell
+kubeseal --controller-name sealed-secrets-controller --controller-namespace kube-system --fetch-cert > cert.pem
+# crear el Secret en claro (sin subirlo a Git), sellarlo y reemplazar P8/charts/sa-platform/templates/sealed-secret.yaml
+kubeseal --cert cert.pem --format yaml < secret-en-claro.yaml > sealed-secret.yaml
+.\scripts\backup-sealed-key.ps1          # respaldar la llave nueva
+```
 
-
----
-
-## Escenario 3: Restauración de un nodo
-
-**Cuándo usar:** Cuando un nodo falla o necesita mantenimiento.
-
-### Paso 1: Drenar el nodo
-
-kubectl get nodes
-kubectl drain nombre-nodo --ignore-daemonsets --delete-emptydir-data --force
-
-**Verificar que el servicio sigue respondiendo:**
-
-kubectl exec -n sa-p8 (kubectl get pods -n sa-p8 -l app.kubernetes.io/name=gateway -o jsonpath='{.items[0].metadata.name}') -- wget -qO- http://gateway:3000/health
-
-**Uncordon:**
-
-kubectl uncordon nombre-nodo
-
-**Verificación:** Los pods evictados deben recrearse automáticamente. El gateway debe seguir respondiendo durante todo el drenaje.
+Como el controlador se despliega con `keyrenewperiod: "0"` (sin rotación automática), la copia del Key Vault no caduca.
+Si alguien rota la llave a mano, ejecute `.\scripts\backup-sealed-key.ps1` inmediatamente después.
 
 ---
 
-## Escenario 4: Recuperación de secretos
+## 7. Preparación inicial (se hace UNA vez, antes de cualquier desastre)
 
-**Cuándo usar:** Cuando los SealedSecrets no se descifran.
+```powershell
+# 7.1 Backend de Terraform (estado remoto con bloqueo) — solo si no existe
+az group create -n rg-sa-p9-backend -l eastus
+az storage account create -n sttfstatesa201901385 -g rg-sa-p9-backend -l eastus --sku Standard_LRS --min-tls-version TLS1_2 --allow-blob-public-access false
+az storage container create --account-name sttfstatesa201901385 -n tfstate --auth-mode login
 
-### Paso 1: Verificar el estado
+# 7.2 Capa persistente: Blob de respaldos + Key Vault
+terraform -chdir=terraform-persistent init
+terraform -chdir=terraform-persistent apply
 
-kubectl get sealedsecret sa-platform-secrets -n sa-p8 -o jsonpath="{.status.conditions[0].message}"
+# 7.3 Primera instalación completa (crea también el schedule de respaldos)
+.\scripts\bootstrap.ps1 -SkipRestore
+# bootstrap.ps1 guarda la llave de Sealed Secrets en el Key Vault al terminar (primera instalación)
+```
 
-Si el mensaje contiene "no key could decrypt secret", la llave es incorrecta.
+## 8. Límites — lo que este runbook NO puede recuperar
 
-### Paso 2: Restaurar la llave
+| Pérdida | Consecuencia | Mitigación pendiente |
+|---|---|---|
+| Se pierde la **capa persistente** (`rg-sa-p9-backend`): Blob de respaldos y/o Key Vault | Sin respaldos no hay datos; sin llaves los SealedSecret son ilegibles | Replicación geográfica (GRS) del Blob y copia de las llaves fuera de Azure |
+| Se borra el repositorio GitHub (GitOps o código) | ArgoCD no tiene qué desplegar | Espejo del repositorio |
+| Datos posteriores al último respaldo (hasta 6 h) | Se pierden | Reducir el intervalo del schedule o WAL archiving en PostgreSQL |
+| Caída de la región `eastus` | Todo lo anterior está en una sola región | Despliegue multi-región (fuera del alcance) |
+| Un nodo cae con PostgreSQL en él | ~60 s sin base de datos | PostgreSQL con réplica (fuera del alcance de la cuota de 4 vCPU) |
 
-az storage blob download `
-    --account-name sttfstatesa201901385 `
-    --container-name sealed-secrets-backup `
-    --name sealed-secrets-key6v5m9.yaml `
-    --file ./sealed-secrets-key.yaml `
-    --auth-mode login
+## 9. Solución de problemas (todos vistos durante las pruebas reales)
 
-kubectl apply -f ./sealed-secrets-key.yaml
-kubectl rollout restart deployment sealed-secrets-controller -n kube-system
+| Síntoma | Causa | Solución |
+|---|---|---|
+| terraform: `Error acquiring the state lock` | Una ejecución anterior murió con el bloqueo tomado | `terraform -chdir=terraform force-unlock <ID>` |
+| terraform: `does not have secrets get permission on key vault` | Falta el rol en el Key Vault (propagación tarda ~5 min) | Asignar `Key Vault Secrets User` y reintentar |
+| terraform: `Insufficient quota` / vCPU | La suscripción permite 4 vCPU en `eastus` = 2 nodos `Standard_D2s_v7` | No subir `node_count` sobre 2; pedir cuota en el portal |
+| `restore-datos`: `PodVolumeRestore completados = 0/0` | Se restauraron solo PVC, o Kyverno rechazó el pod restaurado | Ver el error con `kubectl -n velero describe restore <R>`; comprobar la excepción `restore-wait` en `p8-require-non-root` |
+| Backup `PartiallyFailed`: `repository not initialized in the provided storage` | Quedó un `BackupRepository` apuntando a un almacenamiento distinto | `kubectl -n velero delete backuprepositories --all` y repetir el respaldo |
+| Pods `Pending` con `Insufficient cpu` | Requests demasiado altos para un solo nodo | Los requests ya están ajustados en `environments/dev/values.yaml`; no subirlos |
+| Aplicación de ArgoCD `OutOfSync` en CRD | El API server normaliza campos de los CRD | `ignoreDifferences` ya configurado en `apps/*.yaml` |
+| `verificar.ps1` marca FAIL en «Kyverno bloquea :latest» | Las políticas aún no estaban listas | Esperar 1 min y ejecutar `.\scripts\verificar.ps1` otra vez |
 
-### Paso 3: Re-cifrar si es necesario
+## 10. Referencias
 
-kubeseal --fetch-cert --controller-namespace kube-system --controller-name sealed-secrets-controller > cert.pem
-kubeseal --cert cert.pem --format yaml > sealed-secret.yaml
-
-
----
-
-## Contactos y referencias
-
-**Documentación:**
-- Velero: https://velero.io/docs/
-- ArgoCD app-of-apps: https://argo-cd.readthedocs.io/
-- Sealed Secrets: https://github.com/bitnami-labs/sealed-secrets
-
-**Repositorios:**
-- Código: https://github.com/BillyDread1531/Practicas-SA-B-201901385.git
-- GitOps: https://github.com/BillyDread1531/Practica-SA-P8-GitOps.git
-
-**SPOFs detectados:** ver P9/docs/spofs-detectados.md
-
----
-
-## Objetivos declarados
-
-**RTO (Recovery Time Objective):** 60 minutos
-**RPO (Recovery Point Objective):** 6 horas (intervalo del schedule de Velero)
-
-Documento generado durante la practica de continuidad operativa.
-
+- Diagrama del orden de reconstrucción: [docs/diagrama-bootstrap.md](docs/diagrama-bootstrap.md)
+- Informe de la prueba: [informe-dr.md](informe-dr.md) · Puntos únicos de fallo: [docs/spofs-detectados.md](docs/spofs-detectados.md)
+- Velero: https://velero.io/docs/ · ArgoCD app-of-apps: https://argo-cd.readthedocs.io/ · Sealed Secrets: https://github.com/bitnami/sealed-secrets

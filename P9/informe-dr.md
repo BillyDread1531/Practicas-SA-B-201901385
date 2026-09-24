@@ -1,171 +1,74 @@
-﻿# Informe de la Prueba de Recuperación ante Desastres
+# Informe de la prueba de recuperación ante desastres — Práctica 9
 
-**Práctica:** 9 — Continuidad operativa y recuperación ante desastres
-**Estudiante:** Billy Dread (201901385)
-**Cluster:** aks-sa-p9
-**Fecha:** 2026-09-23
-
----
+**Sistema:** microservicios en AKS `aks-sa-p9` (namespace `sa-p8`) · **Fecha de la prueba:** 2026-09-24 (UTC) ·
+**Evidencia:** [reconstruccion-cronometrada.md](evidencias/reconstruccion-cronometrada.md)
 
 ## 1. Objetivos declarados
 
-**RTO (Recovery Time Objective):** 60 minutos
-**RPO (Recovery Point Objective):** 6 horas
-
-**Justificación:**
-
-El RTO de 60 minutos se eligió porque el bootstrap completo con Terraform tarda aproximadamente 15-20 minutos en crear el clúster y aplicar la app-of-apps con ArgoCD, más el tiempo de sincronización de los microservicios (~30 minutos). Un RTO de 60 minutos da margen para verificación.
-
-El RPO de 6 horas se eligió porque el schedule de Velero corre cada 6 horas (0 */6 * * *). Es el intervalo máximo de pérdida de datos aceptable para el sistema.
-
-
----
+| Objetivo | Valor | Justificación |
+|---|---|---|
+| **RTO** | **60 min** | Se fijó antes de las pruebas: crear AKS + ArgoCD (~10–15 min) y sincronizar los servicios (~5–10 min) suman ~25 min; se dejó margen ×2 por la variabilidad de Azure y para restaurar datos y verificar. |
+| **RPO** | **6 h** | El schedule de Velero corre cada 6 h (`0 */6 * * *`). El sistema es un entorno académico sin transacciones de valor por minuto; 6 h es la pérdida máxima aceptada, y bajar el intervalo aumentaría costo de almacenamiento y carga sobre PostgreSQL. |
 
 ## 2. Escenario ejecutado
 
-Se ejecutaron tres pruebas de recuperación:
+Script `P9/scripts/prueba-reconstruccion.ps1`, en este orden:
 
-**Prueba 1: Pérdida de un nodo**
+1. Se insertaron 5 estudiantes de control (`DR-0001`…`DR-0005`) y se lanzó un respaldo de Velero al Blob persistente (`p9-dr-20260924085848`, verificado en el Blob).
+2. Se insertó `DR-POST` **después** del respaldo (dato que debía perderse).
+3. **Destrucción total** con `terraform destroy`: AKS, ArgoCD, Velero, llaves en el clúster, resource group `rg-sa-p9`, discos y balanceador. No se tocó la capa persistente (Blob de respaldos, Key Vault, estado de Terraform).
+4. **Recuperación con un solo comando**, `scripts/bootstrap.ps1`, sin intervención: Terraform (AKS → ArgoCD → llaves desde Key Vault → Velero → app raíz) → ArgoCD por olas → restauración de datos con Velero → verificación.
+5. Verificación de contenido fila por fila.
 
-Se drenó el nodo aks-system-29442814-vmss000000 con kubectl drain, forzando la evicción de todos los pods de la aplicación. El servicio gateway siguió respondiendo durante todo el proceso.
+Además, en el clúster reconstruido: restauración de datos aislada ([restauracion-datos.md](evidencias/restauracion-datos.md)) y drenaje de nodo con sondeo continuo ([perdida-nodo.md](evidencias/perdida-nodo.md)).
 
-**Prueba 2: Pérdida de datos en PostgreSQL**
+## 3. Tiempos medidos (UTC, del registro de los scripts)
 
-Se insertaron tres estudiantes de prueba en la base de datos academia. Se ejecutó un respaldo con Velero. Se eliminaron los tres registros con DELETE. Se intentó restaurar el respaldo a un namespace separado.
+| Marca | Hora |
+|---|---|
+| Destrucción iniciada → terminada (**T0**, el clúster ya no existe) | 08:59:53 → 09:06:37 (6 min 44 s) |
+| Bootstrap lanzado / `terraform apply` completo | 09:06:37 / 09:15:53 (9 min 10 s) |
+| SealedSecret descifrado (llave restaurada) | 09:19:12 |
+| Restauración de datos | 09:19:15 → 09:21:10 (1 min 55 s) |
+| Servicio responde / **datos verificados (T1)** | 09:21:17 / 09:21:21 |
 
-**Prueba 3: Eliminación y recreación de Deployments**
-
-Se eliminaron los Deployments de auth-service, cursos-service, estudiantes-service, inscripciones-service y el Rollout de gateway, para forzar su recreación desde el repositorio GitOps mediante ArgoCD.
-
-
----
-
-## 3. Tiempos medidos
-
-**Prueba 1 — Pérdida de nodo:**
-
-- Inicio del drain: registrado en el log de drain
-- Duración del drain: 75 segundos
-- Fin del drain (nodo cordoned): node drained
-- Uncordon: ejecutado 30 segundos después
-- Tiempo total de indisponibilidad: 0 segundos (el servicio nunca dejó de responder)
-- RTO real prueba 1: 75 segundos
-
-**Prueba 2 — Restauración de datos:**
-
-- Backup creado: 06:22:20 UTC
-- Backup completado: 06:22:55 UTC (duración: 35 segundos)
-- DELETE ejecutado: 06:23:00 UTC
-- Restore iniciado: 06:23:02 UTC
-- Restore completado: 06:23:03 UTC
-- Verificación con SELECT: NO SE PUDO VERIFICAR LOS DATOS
-- RTO real prueba 2: NO APLICABLE (restore de datos falló)
-
-**Prueba 3 — Recreación de Deployments:**
-
-- Deployments eliminados: registrado en consola
-- ArgoCD recreó los recursos: 30-60 segundos
-- Todos los pods Running: 2 minutos después de la eliminación
-
-
----
+**RTO real = T1 − T0 = 14 min 44 s** frente a 60 min declarados: **cumple**, con margen de 45 min. Es la tercera corrida
+completa; las dos anteriores dieron 16 min 07 s y 12 min 59 s y quedan como registro histórico en `evidencias/`. La primera requirió
+subir un arreglo a GitOps durante la ejecución (`ignoreDifferences` en los CRD de Kyverno); la segunda corrió sin intervención pero el
+verificador marcó un fallo espurio (carrera de 1 s tras reactivar GitOps), corregido; la tercera es la corrida limpia.
 
 ## 4. Pérdida medida
 
-**Prueba 1:** Cero pérdida de datos. Los pods evictados fueron recreados por sus Deployments sin pérdida de estado, porque ninguno de ellos usa almacenamiento persistente.
+- **Recuperado:** los 5 registros de control, idénticos (carnet + email) a los de antes del desastre, más el contenido de RabbitMQ.
+- **No recuperado:** `DR-POST`, insertado 0 min 08 s después de terminar el respaldo (dato posterior al último respaldo).
+- **RPO medido en la prueba: 1 min 03 s** (inicio del respaldo → inicio de la destrucción). **No es el RPO del sistema**: el respaldo se
+  lanzó adrede minutos antes del desastre. El RPO **garantizado** es el intervalo del schedule más la duración del respaldo
+  (~1 min): **≈ 6 h en el peor caso**, es decir, dentro del objetivo pero sin margen. Lo medido demuestra el mecanismo, no el peor caso.
 
-**Prueba 2:** Tres registros de estudiantes fueron eliminados y NO se recuperaron del respaldo durante la prueba. Los datos originales permanecen en Azure Blob (Kopia) pero no fueron inyectados en el PVC restaurado.
+## 5. Puntos únicos de fallo detectados (detalle en [docs/spofs-detectados.md](docs/spofs-detectados.md))
 
-**Prueba 3:** Cero pérdida de datos. ArgoCD recreó todos los recursos desde el repositorio GitOps.
-
-**RPO real medido:** los datos eliminados no se recuperaron. RPO efectivo indefinido para el flujo probado.
-
-
----
-
-## 5. Puntos únicos de fallo detectados
-
-Las pruebas revelaron 8 SPOFs que no eran evidentes durante la operación normal. Los tres más críticos:
-
-**SPOF 1: ArgoCD application-controller con 0 réplicas**
-
-El StatefulSet argocd-application-controller tenía replicas: 0. ArgoCD reportaba las aplicaciones como Synced pero no sincronizaba cambios nuevos. El sistema GitOps estaba silenciosamente roto.
-
-Mitigación: kubectl scale statefulset argocd-application-controller --replicas=1
-
-**SPOF 2: SealedSecret cifrado con llave obsoleta**
-
-El SealedSecret sa-platform-secrets había sido cifrado con la llave del clúster anterior (aks-sa-p6). El controller no podía descifrarlo. Tras un reinicio del clúster, los secretos no podrían regenerarse.
-
-Mitigación: re-cifrado de los secretos con kubeseal usando la llave del clúster actual. La llave fue respaldada en Azure Blob Storage.
-
-**SPOF 3: Velero no restaura datos automáticamente**
-
-El restore de Velero recupera la definición del PVC pero no inyecta los datos de Kopia. Los datos están en Azure Blob pero no se aplican al PVC nuevo. PostgreSQL ejecuta initdb y crea una base vacía.
-
-Mitigación pendiente: crear PodVolumeRestore manualmente o usar Velero CLI con --restore-volumes.
-
-**SPOFs adicionales documentados:** ver P9/docs/spofs-detectados.md
-
-
----
+Lo que la prueba reveló que **no** estaba cubierto y se corrigió: (1) los respaldos y su estado vivían en el mismo resource group que
+el clúster, así que `destroy` los borraba; (2) la llave de Sealed Secrets solo existía en el clúster; (3) la restauración de datos
+«fallaba» por una causa mal diagnosticada: la política Kyverno `require-non-root` rechazaba el initContainer `restore-wait` de Velero;
+(4) el bootstrap exigía instalar tres controladores y restaurar la llave a mano; (5) con 2 nodos, perder uno dejaba 6 pods `Pending`
+por requests sobredimensionados; (6) CronJobs sin ServiceAccount llevaban un día sin ejecutarse; (7) un chart de Sealed Secrets
+cambió de URL y dejó la app en `Unknown`; (8) apps de ArgoCD perpetuamente `OutOfSync` (CRD).
+**Siguen abiertos:** PostgreSQL con una réplica (5xx ~60 s si cae su nodo), dependencias externas (charts, imágenes, GitHub) sin espejo,
+capa persistente de una sola región y una sola copia, ArgoCD/Kyverno/Velero sin alta disponibilidad, y un operador único con `az login`.
 
 ## 6. Brecha y plan
 
-**Brecha entre lo declarado y lo medido:**
+| Indicador | Declarado | Medido | Brecha |
+|---|---|---|---|
+| RTO | 60 min | 14 min 44 s | Ninguna (holgura de 45 min) |
+| RPO | 6 h | 1 min 03 s en la prueba; **≈ 6 h en el peor caso** | Ninguna en el papel, pero sin margen: cualquier respaldo fallido lo supera |
+| Continuidad de la base durante pérdida de nodo | sin interrupción | ~60 s de 5xx en rutas con base de datos si cae el nodo de PostgreSQL | **Sí**: 1 réplica |
+| Recuperación si se pierde la capa persistente | — | No recuperable | **Sí**: no está cubierto |
 
-| Objetivo | Declarado | Medido | Brecha |
-|----------|-----------|--------|--------|
-| RTO prueba 1 (nodo) | 60 min | 75 segundos | Sin brecha |
-| RTO prueba 3 (recreación) | 60 min | 2 minutos | Sin brecha |
-| RPO prueba 2 (datos) | 6 horas | Falló el restore | Brecha total |
+**Honestidad sobre los límites:** el RTO medido excluye la destrucción y supone que la capa persistente, Azure, GitHub y los registros de
+charts/imágenes están disponibles; en un desastre real el RTO dependería también de ellos. El sistema tiene pocos datos (~63 MiB), por
+lo que la restauración fue rápida: con más datos el RTO crecería. La cuota de la suscripción (4 vCPU) limita el clúster a 2 nodos.
 
-**Plan para cerrar la brecha:**
-
-1. **Investigar el mecanismo de restauración de datos con Velero + Kopia.** El PodVolumeRestore debe crearse explícitamente cuando el namespace destino no tiene pods corriendo.
-
-2. **Documentar el procedimiento de restore de datos con Velero CLI.** Comandos como velero restore create --from-backup <backup> --restore-volumes y --include-resources persistentvolumeclaims.
-
-3. **Agregar verificación de datos en el runbook.** Antes de declarar un restore exitoso, verificar contenido con SELECT.
-
-4. **Considerar migrar a restauración in-place** en el mismo namespace, donde Velero sí crea PodVolumeRestore automáticamente.
-
-5. **Automatizar el proceso** con un script que combine el restore del PVC + el PodVolumeRestore + la verificación con SELECT.
-
-**Conclusión:** Las pruebas de pérdida de nodo y de recreación de Deployments fueron exitosas. La prueba de restauración de datos reveló una limitación conocida de Velero + Kopia que requiere intervención manual. El sistema es recuperable pero requiere conocimiento técnico específico para el restore de datos.
-
-
----
-
-## Adenda: Limitación detectada en el restore de datos
-
-Durante la ejecución de la Prueba 2 (restauración de datos), se detectó una limitación específica del stack Velero + Kopia que impide el restore automático de datos:
-
-**Comportamiento observado:**
-
-1. El backup se completa exitosamente (`Completed`, 0 errores).
-2. Los PodVolumeBackups de Kopia se generan con el snapshotID correcto.
-3. El restore recrea el PVC y lo deja en estado Bound.
-4. Sin embargo, los datos NO se inyectan al PVC.
-5. PostgreSQL detecta el PVC vacío y ejecuta initdb, creando una base de datos limpia.
-
-**Causa raíz:**
-
-Velero crea los recursos `PodVolumeRestore` automáticamente solo cuando el pod destino existe en el namespace al momento del restore. Si el namespace no tiene pods corriendo, el restore completa sin inyectar datos de Kopia.
-
-Los intentos manuales de crear `PodVolumeRestore` no funcionaron porque el controller de Velero no los asigna al node-agent correcto sin pasar por su flujo interno de restauración.
-
-**Impacto:**
-
-Los datos están a salvo en Azure Blob Storage (verificado con PodVolumeBackup `Completed`), pero requieren un procedimiento más complejo para restaurarse.
-
-**Procedimiento correcto identificado (no probado por tiempo):**
-
-1. Restaurar en el MISMO namespace donde el pod productivo está corriendo.
-2. Velero detecta el pod existente y crea PodVolumeRestore automáticamente.
-3. Escalar el StatefulSet a 0, borrar el PVC, restaurar, escalar a 1.
-
-**Recomendación:**
-
-Documentar este procedimiento en el runbook y probarlo en una sesión futura.
-
+**Plan para cerrar la brecha:** (1) PostgreSQL con réplica (CloudNativePG) y un tercer nodo al subir la cuota; (2) Blob GRS y copia cifrada de
+las llaves fuera de Azure; (3) espejo de charts, imágenes y repositorios; (4) schedule cada hora + archivado de WAL para bajar el RPO
+a minutos; (5) alertas sobre respaldos fallidos y sobre `argocd-application-controller`; (6) repetir esta prueba de forma programada.

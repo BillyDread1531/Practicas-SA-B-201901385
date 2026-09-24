@@ -63,7 +63,7 @@ Mark "DR: respaldo $backupName Completed (inicio $($bk.status.startTimestamp), f
 $sa  = 'stp9velero201901385'
 $key = az storage account keys list --account-name $sa --resource-group rg-sa-p9-backend --query '[0].value' -o tsv
 $blobs = az storage blob list --account-name $sa --account-key $key --container-name velero --prefix "backups/$backupName/" --query '[].name' -o tsv
-$kopiaCount = az storage blob list --account-name $sa --account-key $key --container-name velero --prefix 'kopia/' --query 'length(@)' -o tsv
+$kopiaCount = @(az storage blob list --account-name $sa --account-key $key --container-name velero --prefix 'kopia/' --query '[].name' -o tsv).Count
 Mark "DR: respaldo verificado en Azure Blob $sa/velero (backups/$backupName/: $(@($blobs).Count) objetos; repositorio kopia: $kopiaCount objetos)"
 
 Invoke-Sql "insert into estudiantes(nombre,apellido,email,carnet) values ('DR','PostRespaldo','dr-post@p9.test','DR-POST')" | Out-Null
@@ -80,7 +80,8 @@ if ($exists -ne 'false') { throw 'El resource group del cluster sigue existiendo
 
 # --- C. Recuperacion (punto de entrada unico) ---------------------------------------------------------------
 Mark 'DR: RECUPERACION iniciada -> scripts/bootstrap.ps1'
-& "$PSScriptRoot\bootstrap.ps1" -LogFile $script:LogFile
+$bootError = $null
+try { & "$PSScriptRoot\bootstrap.ps1" -LogFile $script:LogFile } catch { $bootError = $_; Mark "DR: bootstrap.ps1 FALLO - $($_.Exception.Message)" }
 Mark 'DR: bootstrap.ps1 terminado'
 
 # --- D. Verificacion de datos y calculo de RTO/RPO ---------------------------------------------------------------
@@ -182,4 +183,5 @@ $log
 "@
 Set-Content -Path $EvidenceFile -Value $md -Encoding UTF8
 Mark "DR: evidencia escrita en $EvidenceFile"
+if ($bootError) { throw $bootError }
 if (-not $ok) { throw 'La verificacion de contenido tras la reconstruccion fallo' }

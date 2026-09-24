@@ -120,4 +120,10 @@ finally {
     Mark 'restore-datos: reactivando GitOps'
     Set-KubePatch argocd application p9-root-app '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'
 }
+# GitOps vuelve a reconciliar: esperar a que la app raiz y sus hijas queden Synced.
+Wait-Until -What 'p9-root-app Synced tras reactivar GitOps' -TimeoutSeconds 300 -IntervalSeconds 5 -Condition {
+    $apps = @((Get-Kube -n argocd get applications -o json | ConvertFrom-Json).items)
+    (@($apps | Where-Object { $_.status.sync.status -ne 'Synced' }).Count -eq 0)
+}
+Mark 'restore-datos: GitOps reactivado y aplicaciones Synced'
 Mark 'restore-datos: FIN'

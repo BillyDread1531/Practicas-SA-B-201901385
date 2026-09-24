@@ -1,137 +1,31 @@
-﻿
-# SPOFs detectados durante las pruebas de P9
-
-**Fecha de las pruebas:** 2026-09-23
-**Cluster:** aks-sa-p9
-**Responsable:** Billy Dread (201901385)
-
----
-
-## Introducción
-
-Durante la ejecución de las pruebas de recuperación ante desastres (DR) de la Práctica 9, se detectaron 8 puntos únicos de fallo (SPOFs) en el ecosistema construido en las prácticas anteriores. Este documento los lista con su impacto y la mitigación aplicada.
-
----
-
-## SPOF #1: ArgoCD application-controller con 0 réplicas
-
-**Síntoma:** ArgoCD reportaba las aplicaciones como `Synced` pero no sincronizaba cambios nuevos. Las revisiones quedaban congeladas en commits antiguos.
-
-**Causa raíz:** El StatefulSet `argocd-application-controller` tenía `replicas: 0`. El controller no estaba corriendo.
-
-**Impacto:** Crítico. Todo el flujo GitOps estaba silenciosamente roto.
-
-**Mitigación aplicada:** `kubectl scale statefulset argocd-application-controller -n argocd --replicas=1`.
-
-**Lección:** Monitorear el estado del controller es esencial. Un simple `kubectl get pods -n argocd` lo habría detectado.
-
----
-
-## SPOF #2: SealedSecret cifrado con llave obsoleta
-
-**Síntoma:** El SealedSecret `sa-platform-secrets` estaba en estado `Status: False`. El controller no podía descifrarlo.
-
-**Causa raíz:** El SealedSecret había sido cifrado con la llave del clúster anterior (`aks-sa-p6`), no con la llave del clúster actual (`aks-sa-p9`).
-
-**Impacto:** Crítico. Los secretos no podían regenerarse tras un reinicio del clúster.
-
-**Mitigación aplicada:** Re-cifrado de los secretos con `kubeseal` usando el certificado público del clúster actual.
-
-**Lección:** El SealedSecret debe re-cifrarse cada vez que se cambia de clúster.
-
----
-
-## SPOF #3: SealedSecret almacenado en el path incorrecto
-
-**Síntoma:** El SealedSecret del repositorio GitOps no coincidía con el aplicado por ArgoCD.
-
-**Causa raíz:** Existían dos archivos `sealed-secret.yaml`: uno en `P8-GitOps/security/` (huérfano) y otro en `P8/charts/sa-platform/templates/` (el que ArgoCD realmente aplicaba).
-
-**Impacto:** Alto. Cualquier actualización al SealedSecret del repo GitOps no surtía efecto.
-
-**Mitigación aplicada:** Copiar el SealedSecret correcto al chart `sa-platform`, que es el que ArgoCD lee.
-
-**Lección:** Documentar cuál es el archivo fuente que ArgoCD lee realmente.
-
----
-
-## SPOF #4: Imágenes con tag `:p6` incompatible con ARM64
-
-**Síntoma:** Los pods nuevos aparecían con `ErrImagePull` o `ImagePullBackOff`.
-
-**Causa raíz:** Las imágenes con tag `:p6` fueron construidas para arquitectura AMD64, pero los nodos del clúster son ARM64. Además, las imágenes ya no existían en ACR con ese tag.
-
-**Impacto:** Alto. Los Deployments nuevos no podían arrancar.
-
-**Mitigación aplicada:** Cambiar los tags a SHA inmutables (`51cfc6bb05adaad0fa541395046daf466f545821`) en los `values.yaml` del repo GitOps.
-
-**Lección:** Nunca usar tags mutables (`latest`, `p6`). Siempre SHA o semánticos.
-
----
-
-## SPOF #5: Anti-afinidad `required` causaba deadlock
-
-**Síntoma:** Varios pods quedaban en `Pending` sin poder agendarse.
-
-**Causa raíz:** La anti-afinidad `requiredDuringScheduling` obligaba a que cada réplica estuviera en un nodo distinto. Con 2 nodos y 2 réplicas por servicio, los nuevos pods no cabían.
-
-**Impacto:** Alto. Deadlock de scheduling.
-
-**Mitigación aplicada:** Cambiar a `preferredDuringScheduling` con `weight: 100`. Permite convivir réplicas en el mismo nodo si es necesario.
-
-**Lección:** En clústeres pequeños, la anti-afinidad estricta es contraproducente.
-
----
-
-## SPOF #6: `spec.selector` inmutable impedía actualizar Deployments
-
-**Síntoma:** ArgoCD fallaba con `spec.selector: Invalid value: field is immutable`.
-
-**Causa raíz:** Se intentó cambiar los labels del selector de los Deployments. Kubernetes no permite modificar `spec.selector` en un Deployment existente.
-
-**Impacto:** Alto. Los Deployments no podían actualizarse.
-
-**Mitigación aplicada:** Borrar los Deployments y dejar que ArgoCD los recree desde cero.
-
-**Lección:** El `spec.selector` de un Deployment es inmutable. Si necesita cambiar, borrar y recrear.
-
----
-
-## SPOF #7: Velero no restaura volúmenes automáticamente
-
-**Síntoma:** Después de un `velero restore`, los PVCs se creaban pero estaban vacíos. PostgreSQL ejecutaba `initdb` y creaba una base de datos nueva.
-
-**Causa raíz:** Velero con Kopia (FS backup) no crea automáticamente los recursos `PodVolumeRestore` cuando el namespace destino no tiene pods corriendo. Los datos están en Azure Blob pero no se aplican al PVC.
-
-**Impacto:** Crítico. El restore de datos no funciona out-of-the-box.
-
-**Mitigación aplicada:** Pendiente. Documentar como limitación conocida. Los datos permanecen en Azure Blob y pueden restaurarse manualmente.
-
-**Lección:** El restore de datos con Velero requiere verificación explícita del contenido del PVC, no solo de su existencia.
-
----
-
-## SPOF #8: Clave de Azure Storage expuesta en salida de comandos
-
-**Síntoma:** Durante la verificación de Velero, la clave del storage account apareció en la salida de PowerShell.
-
-**Causa raíz:** El comando `az storage account keys list` imprime la clave si no se filtra la salida.
-
-**Impacto:** Alto. Riesgo de seguridad. La clave podría haber sido comprometida.
-
-**Mitigación aplicada:** Rotación inmediata de la clave. Actualización del secret de Velero con la nueva clave.
-
-**Lección:** Nunca imprimir claves. Usar variables y filtrar la salida.
-
----
-
-## Conclusiones
-
-Las pruebas de DR revelaron 8 SPOFs que no eran evidentes durante la operación normal del sistema. Los más críticos son:
-
-1. El controller de ArgoCD detenido silenciosamente.
-2. Los SealedSecrets cifrados con llaves obsoletas.
-3. La ausencia de restauración automática de datos con Velero.
-
-Todos ellos están documentados con su mitigación y se incluyen en el runbook de recuperación.
-
+# Puntos únicos de fallo (SPOF) detectados en P9
+
+Cada fila es algo que **las pruebas revelaron** (no una lista teórica). «Estado» dice si quedó cerrado, cerrado a medias o
+abierto, y por qué. Las pruebas están en [../evidencias/](../evidencias/).
+
+## A. Descubiertos y cerrados
+
+| # | SPOF | Cómo se descubrió | Impacto | Cierre |
+|---|---|---|---|---|
+| 1 | **Los respaldos morían con el clúster.** El Storage de Velero estaba en `rg-sa-p9` y en el mismo estado de Terraform que el AKS: `terraform destroy` borraba respaldos y clúster a la vez (la reconstrucción del 2026-09-23 perdió su propia copia de la llave por lo mismo). | Al diseñar el destroy de la prueba cronometrada | Crítico: cero datos recuperables tras el desastre | Capa persistente `P9/terraform-persistent` (otro resource group, otro estado): Blob de respaldos + Key Vault. `prevent_destroy` en ambos. |
+| 2 | **La llave de Sealed Secrets solo existía en el clúster** (más un YAML en el disco del estudiante). | Requisito 3.1 del enunciado y revisión del bootstrap previo | Crítico: repositorio lleno de contenido ilegible tras perder el clúster | Copia en Key Vault (`backup-sealed-key.ps1`), restauración automática por Terraform **antes** del controlador (`sealed-secrets-key.tf`), controlador sin rotación de llave. Probado en la reconstrucción. |
+| 3 | **La restauración de datos «no funcionaba» y se documentó como limitación de Velero.** | Prueba 2 original: PVC restaurado vacío | Crítico: RPO indefinido | Causa real: la política Kyverno `p8-require-non-root` **rechazaba el pod restaurado** porque Velero le inyecta el initContainer `restore-wait` sin `runAsNonRoot`; sin pod no hay `PodVolumeRestore`. Además se restauraban solo PVC. Se exime únicamente a `restore-wait` y se restauran `statefulsets + pods + PVC + PV`. |
+| 4 | **Bootstrap con pasos manuales:** Argo Rollouts, Sealed Secrets y Kyverno se instalaban con `kubectl apply` de URLs externas y la llave se restauraba a mano. | Revisión del README previo | Alto: viola «sin pasos manuales»; RTO dependiente de una persona | Los tres son `Application` del app-of-apps con sync waves; llaves y Velero los crea Terraform; un solo comando (`scripts/bootstrap.ps1`). |
+| 5 | **El chart de Sealed Secrets cambió de URL** (`bitnami-labs.github.io` → `bitnami.github.io`, 404) y la app quedó `Unknown` en silencio. | Diagnóstico de ArgoCD | Alto: el controlador de secretos no se habría instalado en una reconstrucción | URL corregida en `apps/sealed-secrets.yaml`. Riesgo residual en B-2. |
+| 6 | **Un solo nodo no podía alojar el sistema:** al drenar uno quedaban 6 pods `Pending` (`Insufficient cpu`) porque los requests eran 10–50 veces el uso real (1–10 m). | Prueba de nodo, primera corrida (evidencia conservada en [perdida-nodo-2nodos-hallazgo.md](../evidencias/perdida-nodo-2nodos-hallazgo.md)) | Alto: el servicio seguía respondiendo con 1 réplica, pero sin redundancia | Requests ajustados al uso real (`environments/dev/values.yaml`, Kyverno, Velero). La cuota de la suscripción (4 vCPU) impide un tercer nodo. Segunda corrida: todo `Ready` en 2 s. |
+| 7 | **CronJobs sin ServiceAccount:** `cron-insert-sa`, `cron-resumen-sa`, `cron-consumer-sa` no existían; los Jobs llevaban 22 h «Running» sin pods y el consumidor nunca arrancó. | Aplicación `sa-platform-dev` permanentemente `Degraded` | Medio: una parte del sistema llevaba un día muerta sin alarma | ServiceAccounts añadidas al chart (`cronjobs.yaml`). |
+| 8 | **`BackupRepository` de Kopia obsoleto** tras cambiar el destino de Velero: los respaldos fallaban con `repository not initialized in the provided storage`. | Primer respaldo tras migrar a la capa persistente | Medio | Documentado en el runbook (§9); no ocurre en una reconstrucción porque el CR no existe aún. |
+| 9 | **PAT de GitHub como entrada obligatoria** de `terraform apply` (y guardado en el estado). | Revisión de `repo-credentials.tf` | Medio: paso manual y secreto en el estado | El repositorio de código es público; el recurso se eliminó. `terraform apply` ya no pide nada. |
+| 10 | **Aplicaciones de ArgoCD perpetuamente `OutOfSync`** (CRD normalizados por el API server; CRD `policies.kyverno.io` sin uso). | `kubectl get applications` | Bajo: ruido que oculta divergencias reales | `ignoreDifferences` en los CRD y grupo de CRD innecesario desactivado. |
+
+## B. Abiertos (declarados, no ocultos)
+
+| # | SPOF | Evidencia | Por qué sigue abierto | Plan |
+|---|---|---|---|---|
+| 1 | **PostgreSQL con una sola réplica.** Al perder su nodo las rutas con base de datos devuelven 5xx ~60 s (HTTP 200 en `/health`, 5xx en `/cursos`). | [perdida-nodo.md](../evidencias/perdida-nodo.md), escenario B | Réplica de lectura/streaming requiere más CPU (cuota 4 vCPU) y cambiar el chart | PostgreSQL en modo `replication` con `synchronous_commit` o un operador (CloudNativePG); requiere subir cuota. |
+| 2 | **Dependencias externas en tiempo de reconstrucción:** charts de Helm (`argoproj.github.io`, `bitnami.github.io`, `kyverno.github.io`, `vmware-tanzu.github.io`), imágenes en Docker Hub (`bitnami/postgresql` por digest, `bitnamilegacy/rabbitmq`) y GitHub. El SPOF 5 fue un ejemplo real. | Incidente 5 | No hay registro/mirror propio | Espejo de charts e imágenes en el ACR y espejo del repositorio Git. |
+| 3 | **La capa persistente es una sola región y una sola copia** (Blob LRS + Key Vault sin réplica). | [runbook §8](../runbook-recuperacion.md) | Costo/alcance | Blob GRS, copia cifrada de las llaves fuera de Azure. |
+| 4 | **RPO de hasta 6 h** (intervalo del schedule) + duración del respaldo. | [informe-dr.md](../informe-dr.md) | Es el objetivo declarado | Schedule más frecuente y archivado de WAL. |
+| 5 | **ArgoCD, Kyverno y Velero con una sola réplica**; si el controlador de ArgoCD se detiene (ya ocurrió antes de P9) la sincronización se congela sin alarma. | Historial previo del proyecto | Cuota de CPU | Alerta sobre `argocd-application-controller` y ArgoCD en HA cuando haya capacidad. |
+| 6 | **Higiene de secretos en disco:** existen copias locales sin cifrar de secretos (`P9/secrets-backup/`, `P9_BACKUP_*`, `P9.zip`) fuera del repositorio (están en `.gitignore`), y en P9 previo una clave de Storage se imprimió en consola (ya rotada). | `git status`, historial | Son copias del estudiante, no del sistema | Borrarlas: la llave ya vive en el Key Vault. |
+| 7 | **Todo depende de un operador con `az login` y permisos de Owner** en la suscripción. | Prerrequisitos del runbook | Modelo de identidad del curso | Identidad administrada/pipeline de recuperación en GitHub Actions con OIDC. |

@@ -34,6 +34,9 @@ Check 'Nodos AKS Ready' {
 }
 
 Check 'GitOps: app-of-apps y aplicaciones hijas' {
+    Wait-Until -What 'p9-root-app Synced' -TimeoutSeconds 180 -IntervalSeconds 5 -Condition {
+        (Get-Kube -n argocd get application p9-root-app -o jsonpath='{.status.sync.status}') -eq 'Synced'
+    }
     $list = @((Get-Kube -n argocd get applications -o json | ConvertFrom-Json).items)
     $root = $list | Where-Object { $_.metadata.name -eq 'p9-root-app' }
     if (-not $root -or $root.status.sync.status -ne 'Synced') { throw 'p9-root-app no esta Synced' }

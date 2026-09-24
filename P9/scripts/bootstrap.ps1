@@ -132,4 +132,6 @@ if ($SkipRestore) {
 
 # --- 4. Verificacion --------------------------------------------------------------------------------------
 & "$PSScriptRoot\verificar.ps1" -LogFile $LogFile
+$verifyRc = $LASTEXITCODE
 Mark 'bootstrap: FIN'
+if ($verifyRc -ne 0) { throw 'verificar.ps1 reporto controles con FALLO (ver el registro)' }
