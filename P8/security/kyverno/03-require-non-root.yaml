@@ -37,7 +37,9 @@ spec:
             pattern:
               securityContext:
                 runAsNonRoot: true
-          - list: "request.object.spec.initContainers"
+          # Velero inyecta el initContainer "restore-wait" al restaurar volumenes
+          # (fs-backup); es el unico initContainer exento para no bloquear el DR.
+          - list: "request.object.spec.initContainers[?name != 'restore-wait']"
             pattern:
               securityContext:
                 runAsNonRoot: true
