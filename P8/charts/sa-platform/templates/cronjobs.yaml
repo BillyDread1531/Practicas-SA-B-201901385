@@ -1,4 +1,18 @@
 # ============================================================
+# SERVICE ACCOUNTS DE LOS CRONJOBS
+# (sin ellos los Jobs quedaban 22h sin poder crear pods)
+# ============================================================
+{{- range list "cron-insert-sa" "cron-resumen-sa" "cron-consumer-sa" }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ . }}
+  namespace: {{ $.Values.global.namespace }}
+automountServiceAccountToken: false
+{{- end }}
+---
+# ============================================================
 # CRONJOB 1
 # CADA 2 MINUTOS INSERTA REGISTRO
 # ============================================================
