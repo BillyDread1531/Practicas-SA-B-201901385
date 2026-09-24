@@ -16,8 +16,8 @@ resource "kubectl_manifest" "root_app" {
     spec:
       project: default
       source:
-        repoURL: https://github.com/BillyDread1531/Practica-SA-P8-GitOps.git
-        targetRevision: p9
+        repoURL: ${var.gitops_repo_url}
+        targetRevision: ${var.gitops_revision}
         path: apps
         directory:
           recurse: true
@@ -32,5 +32,11 @@ resource "kubectl_manifest" "root_app" {
           - CreateNamespace=true
   YAML
 
-  depends_on = [helm_release.argocd]
+  # Orden de dependencias del DR: clúster -> ArgoCD -> llaves de Sealed Secrets
+  # (para que el controlador las encuentre al arrancar) -> Velero -> app raiz.
+  depends_on = [
+    helm_release.argocd,
+    kubectl_manifest.sealed_secrets_key,
+    helm_release.velero,
+  ]
 }

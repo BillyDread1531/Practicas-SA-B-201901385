@@ -1,34 +1,11 @@
-provider "kubernetes" {
-  host                   = azurerm_kubernetes_cluster.aks.kube_config[0].host
-  client_certificate     = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].client_certificate)
-  client_key             = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].client_key)
-  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].cluster_ca_certificate)
-}
-
 data "azurerm_client_config" "current" {}
 
-resource "azurerm_storage_account" "velero" {
-  name                     = var.velero_storage_account_name
-  resource_group_name      = azurerm_resource_group.p9.name
-  location                 = azurerm_resource_group.p9.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
-  min_tls_version          = "TLS1_2"
-
-  blob_properties {
-    versioning_enabled = true
-  }
-
-  tags = {
-    practica = "P9"
-    servicio = "velero"
-  }
-}
-
-resource "azurerm_storage_container" "velero" {
-  name                  = var.velero_blob_container_name
-  storage_account_name  = azurerm_storage_account.velero.name
-  container_access_type = "private"
+# Destino de los respaldos: Storage Account de la capa PERSISTENTE
+# (P9/terraform-persistent). Esta fuera del clúster y del estado que se
+# destruye en el DR, por lo que los respaldos sobreviven a la perdida total.
+data "azurerm_storage_account" "velero" {
+  name                = var.velero_storage_account_name
+  resource_group_name = var.persistent_resource_group
 }
 
 resource "helm_release" "velero" {
@@ -45,9 +22,10 @@ resource "helm_release" "velero" {
     upgradeCRDs     = false
     snapshotsEnabled = false
 
+    # Requests bajos (uso real < 10 m) para que un solo nodo pueda alojar todo el sistema.
     resources = {
       requests = {
-        cpu    = "100m"
+        cpu    = "25m"
         memory = "128Mi"
       }
       limits = {
@@ -59,7 +37,7 @@ resource "helm_release" "velero" {
     nodeAgent = {
       resources = {
         requests = {
-          cpu    = "100m"
+          cpu    = "25m"
           memory = "128Mi"
         }
         limits = {
@@ -73,10 +51,10 @@ resource "helm_release" "velero" {
       backupStorageLocation = [{
         name     = "default"
         provider = "azure"
-        bucket   = azurerm_storage_container.velero.name
+        bucket   = var.velero_blob_container_name
         config = {
-          resourceGroup           = azurerm_resource_group.p9.name
-          storageAccount          = azurerm_storage_account.velero.name
+          resourceGroup           = var.persistent_resource_group
+          storageAccount          = data.azurerm_storage_account.velero.name
           subscriptionId          = data.azurerm_client_config.current.subscription_id
           useAAD                  = "false"
           storageAccountKeyEnvVar = "AZURE_STORAGE_ACCOUNT_ACCESS_KEY"
@@ -91,7 +69,7 @@ resource "helm_release" "velero" {
         cloud = <<-EOT
           AZURE_SUBSCRIPTION_ID=${data.azurerm_client_config.current.subscription_id}
           AZURE_TENANT_ID=${data.azurerm_client_config.current.tenant_id}
-          AZURE_STORAGE_ACCOUNT_ACCESS_KEY=${azurerm_storage_account.velero.primary_access_key}
+          AZURE_STORAGE_ACCOUNT_ACCESS_KEY=${data.azurerm_storage_account.velero.primary_access_key}
         EOT
       }
     }
@@ -129,5 +107,5 @@ resource "helm_release" "velero" {
     }
   })]
 
-  depends_on = [azurerm_storage_container.velero, helm_release.argocd]
+  depends_on = [helm_release.argocd]
 }

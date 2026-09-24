@@ -8,7 +8,7 @@
 *.tfstate.*
 *.tfstate.backup
 *.tfstate.bak-*
-.terraform.lock.hcl
+# (el lock de proveedores SI se versiona: reproducibilidad de IaC)
 crash.log
 crash.*.log
 *.tfvars
@@ -107,3 +107,9 @@ P7/node_modules/
 # --- Archivos sueltos generados por pruebas (nombre raro) ---
 /Dockerfile*[!a-zA-Z0-9._-]*
 /Dockerfile*
+
+# --- Respaldos locales de P9 (contienen estado/secretos: nunca al repo) ---
+/P9.zip
+/P9_BACKUP_*/
+/P9/Practica_9_2S2026.md
+P9/scripts/*.log

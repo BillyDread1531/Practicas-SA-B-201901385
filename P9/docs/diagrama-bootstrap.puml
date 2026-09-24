@@ -1,85 +1,83 @@
-﻿@startuml
+@startuml
 !theme plain
-title Orden de reconstruccion - Practica 9
-
+title Orden de reconstruccion y dependencias - Practica 9\n(rojo = manual, azul = Terraform, verde = ArgoCD, amarillo = script, gris = capa persistente)
 skinparam backgroundColor #FFFFFF
 skinparam defaultFontName Arial
 skinparam defaultFontSize 11
-
-package "FASE 1 - Manual (5 min)" as fase1 #FFE6E6 {
-  rectangle "1. az login" as step1
-  rectangle "2. terraform init" as step2
-  rectangle "3. terraform apply" as step3
+skinparam rectangle {
+  RoundCorner 8
 }
 
-package "FASE 2 - Automatico Terraform (15 min)" as fase2 #E6F3FF {
-  rectangle "4. Crear Resource Group rg-sa-p9" as step4
-  rectangle "5. Crear Cluster AKS aks-sa-p9" as step5
-  rectangle "6. Configurar rol AcrPull" as step6
-  rectangle "7. Instalar ArgoCD via Helm" as step7
-  rectangle "8. Instalar Velero via Helm" as step8
-  rectangle "9. Crear Storage Account Velero" as step9
-  rectangle "10. Aplicar app-of-apps p9-root-app" as step10
-  rectangle "11. Crear credenciales repos GitOps" as step11
+package "CAPA PERSISTENTE - rg-sa-p9-backend (fuera del cluster, NO se destruye)" as P #EEEEEE {
+  database "Estado Terraform\nBlob tfstate + lock" as TFSTATE
+  database "Blob stp9velero201901385/velero\nrespaldos Velero + repo Kopia" as BLOB
+  database "Key Vault kv-p9-201901385\nllaves de Sealed Secrets" as KV
+  database "GitHub publico\nrepo GitOps (rama p9) + repo de codigo" as GIT
 }
 
-package "FASE 3 - Automatico ArgoCD (30 min)" as fase3 #E6FFE6 {
-  rectangle "12. ArgoCD lee p9-root-app" as step12
-  rectangle "13. Descubre sa-platform-dev" as step13
-  rectangle "14. Aplica Helm chart sa-platform" as step14
-  rectangle "15. Despliega microservicios" as step15
-  rectangle "16. Aplica Kyverno policies" as step16
-  rectangle "17. Sincroniza SealedSecret" as step17
+package "FASE 0 - MANUAL (unico paso humano)" as F0 #FFD6D6 {
+  rectangle "az login" as LOGIN
+  rectangle "P9/scripts/bootstrap.ps1\n(punto de entrada unico)" as RUN
 }
 
-package "FASE 4 - Manual verificacion (10 min)" as fase4 #FFF6E6 {
-  rectangle "18. kubectl get nodes" as step18
-  rectangle "19. kubectl get applications" as step19
-  rectangle "20. Verificar gateway /health" as step20
-  rectangle "21. Verificar SELECT en PostgreSQL" as step21
+package "FASE 1 - AUTOMATICO: terraform apply" as F1 #D6E9FF {
+  rectangle "terraform init\nbackend remoto con bloqueo" as INIT
+  rectangle "Resource group rg-sa-p9" as RG
+  rectangle "Cluster AKS aks-sa-p9 (2 nodos)" as AKS
+  rectangle "Rol AcrPull" as ACR
+  rectangle "ArgoCD (Helm)" as ARGO
+  rectangle "Secret con llaves Sealed Secrets\nen kube-system" as KEYS
+  rectangle "Velero (Helm) + schedule\nvelero-p9-platform cada 6 h" as VEL
+  rectangle "Application p9-root-app\n(app-of-apps, ns argocd)" as ROOT
 }
 
-step1 --> step2
-step2 --> step3
-step3 --> step4
-step4 --> step5
-step5 --> step6
-step6 --> step7
-step7 --> step8
-step8 --> step9
-step9 --> step10
-step10 --> step11
-step11 --> step12
-step12 --> step13
-step13 --> step14
-step14 --> step15
-step15 --> step16
-step16 --> step17
-step17 --> step18
-step18 --> step19
-step19 --> step20
-step20 --> step21
+package "FASE 2 - AUTOMATICO: ArgoCD sincroniza apps/ por olas" as F2 #D8F5D8 {
+  rectangle "OLA 0 (paralelo)\nsealed-secrets, argo-rollouts, kyverno" as W0
+  rectangle "OLA 1\np8-kyverno-policies" as W1
+  rectangle "OLA 2\nsa-platform-dev\n(microservicios, PostgreSQL, RabbitMQ,\nSealedSecret, Rollout gateway)" as W2
+  rectangle "Controlador descifra el SealedSecret\ncon la llave restaurada" as DEC
+}
 
-note right of fase1
-  Requiere operador humano
-  RTO inicio: 00:00
+package "FASE 3 - AUTOMATICO: mismo comando (bootstrap.ps1)" as F3 #FFF3C4 {
+  rectangle "Espera apps Synced/Healthy,\nSealedSecret Synced, pods Ready" as WAIT
+  rectangle "restore-datos.ps1\npausa GitOps -> borra STS/PVC vacios ->\nVelero Restore -> PodVolumeRestore -> reactiva GitOps" as RST
+  rectangle "verificar.ps1\nGitOps, secretos, Velero, Rollout,\nKyverno bloquea :latest, gateway, datos" as VER
+}
+
+LOGIN --> RUN
+RUN ==> INIT
+INIT --> RG
+RG --> AKS
+AKS --> ACR
+AKS --> ARGO
+ARGO --> KEYS
+ARGO --> VEL
+KEYS --> ROOT
+VEL --> ROOT
+ROOT ==> W0
+W0 --> W1
+W1 --> W2
+W2 --> DEC
+DEC ==> WAIT
+WAIT --> RST
+RST --> VER
+
+TFSTATE ..> INIT : lee/escribe estado
+KV ..> KEYS : lee llaves
+BLOB ..> VEL : destino de respaldos
+BLOB ..> RST : origen de la restauracion
+GIT ..> W0 : lee manifiestos
+KEYS ..> DEC : el controlador las carga\nal arrancar
+
+note bottom of F2
+  Dependencia clave: las llaves deben estar en kube-system ANTES de que
+  arranque el controlador; si no, genera una llave nueva y el SealedSecret
+  del repositorio queda ilegible.
 end note
 
-note right of fase2
-  Automatico por Terraform
-  Dependencias: AKS antes que ArgoCD
-  ArgoCD antes que Velero
+note bottom of F3
+  Dependencia clave: la politica Kyverno p8-require-non-root exime al
+  initContainer "restore-wait" de Velero; sin eso el pod restaurado es
+  rechazado y el volumen queda vacio.
 end note
-
-note right of fase3
-  Automatico por ArgoCD selfHeal
-  Dependencias: p9-root-app antes que sa-platform-dev
-  Sin intervencion manual
-end note
-
-note right of fase4
-  Verificacion manual obligatoria
-  RTO fin: 01:00 (60 min)
-end note
-
 @enduml

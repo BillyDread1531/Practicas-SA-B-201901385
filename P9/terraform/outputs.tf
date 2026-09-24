@@ -12,7 +12,7 @@ output "kube_config_raw" {
 }
 
 output "velero_storage_account" {
-  value = azurerm_storage_account.velero.name
+  value = data.azurerm_storage_account.velero.name
 }
 
 output "velero_schedule" {

@@ -17,8 +17,12 @@ resource "azurerm_kubernetes_cluster" "aks" {
 
   default_node_pool {
     name       = "system"
-    node_count = 2
+    node_count = var.node_count
     vm_size    = "Standard_D2s_v7"
+
+    upgrade_settings {
+      max_surge = "10%"
+    }
   }
 
   identity {
