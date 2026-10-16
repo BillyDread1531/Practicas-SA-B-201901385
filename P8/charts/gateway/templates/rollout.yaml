@@ -38,7 +38,7 @@ spec:
             args:
               - name: canary-hash
                 valueFrom:
-                  podTemplateHashValue: Canary
+                  podTemplateHashValue: Latest
         - pause:
             duration: 20s
 
@@ -49,7 +49,7 @@ spec:
             args:
               - name: canary-hash
                 valueFrom:
-                  podTemplateHashValue: Canary
+                  podTemplateHashValue: Latest
         - pause:
             duration: 20s
 
@@ -60,7 +60,7 @@ spec:
             args:
               - name: canary-hash
                 valueFrom:
-                  podTemplateHashValue: Canary
+                  podTemplateHashValue: Latest
         - pause:
             duration: 20s
 
@@ -71,7 +71,7 @@ spec:
             args:
               - name: canary-hash
                 valueFrom:
-                  podTemplateHashValue: Canary
+                  podTemplateHashValue: Latest
 
   template:
     metadata:
