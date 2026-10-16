@@ -41,7 +41,7 @@ function Invoke-LokiAPI([string]$Query, [int]$Limit = 20) {
     } finally { Stop-Process -Id $pf.Id -Force -ErrorAction SilentlyContinue }
 }
 function Invoke-TempoAPI([string]$Path) {
-    $pf = Start-PortForward -Namespace observability -Service tempo -LocalPort 13200 -RemotePort 3100
+    $pf = Start-PortForward -Namespace observability -Service tempo -LocalPort 13200 -RemotePort 3200
     try {
         return Invoke-RestMethod -Uri "http://127.0.0.1:13200$Path" -TimeoutSec 10
     } finally { Stop-Process -Id $pf.Id -Force -ErrorAction SilentlyContinue }
@@ -79,7 +79,7 @@ Mark 'sintoma-causa: buscando una traza con error de auth-service en Tempo'
 $traceId = $null
 Wait-Until -What 'traza con error en Tempo' -TimeoutSeconds 120 -IntervalSeconds 5 -Condition {
     $q = [uri]::EscapeDataString('{ resource.service.name="auth-service" && status=error }')
-    $r = Invoke-TempoAPI "/api/v2/search?q=$q&limit=5"
+    $r = Invoke-TempoAPI "/api/search?q=$q&limit=5"
     if ($r.traces -and $r.traces.Count -gt 0) { $script:traceId = $r.traces[0].traceID; $true } else { $false }
 }
 Mark "sintoma-causa: trace_id de error encontrado = $traceId"
