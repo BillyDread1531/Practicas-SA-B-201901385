@@ -21,9 +21,15 @@ spec:
 
   strategy:
     canary:
-      stableService: {{ include "gateway.fullname" . }}
-      canaryService: {{ include "gateway.fullname" . }}-canary
-
+      # Sin stableService/canaryService: con esos definidos pero SIN un
+      # trafficRouting (Istio/Nginx/SMI, que este cluster de un nodo no
+      # tiene), Argo Rollouts fija el Service "gateway" a los pods
+      # estables unicamente y el canary nunca recibe trafico real, asi que
+      # el AnalysisTemplate siempre mide NaN. Sin esos dos campos, el unico
+      # Service "gateway" selecciona por las labels comunes (sin el hash) y
+      # Kubernetes reparte el trafico de forma nativa entre pods estables y
+      # canary segun su proporcion real de replicas: canary basico, sin
+      # malla de servicio.
       steps:
         - setWeight: 20
         - analysis:
