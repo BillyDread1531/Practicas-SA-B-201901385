@@ -26,7 +26,7 @@ $script:LogFile = Join-Path ([IO.Path]::GetTempPath()) ("p10-canary-{0}.log" -f 
 Set-Content -Path $script:LogFile -Value '' -Encoding UTF8
 
 Mark 'canary-metricas: trafico de base (20s)'
-& "$PSScriptRoot\generar-trafico.ps1" -DurationSeconds 20 -RequestsPerSecond 2 -Namespace $Namespace
+& "$PSScriptRoot\generar-trafico.ps1" -DurationSeconds 20 -RequestsPerSecond 2 -Namespace $Namespace -InCluster
 
 $rolloutBefore = Get-Kube -n $Namespace get rollout gateway -o json | ConvertFrom-Json
 $revisionBefore = $rolloutBefore.status.currentPodHash
@@ -50,7 +50,7 @@ Mark "canary-metricas: revision canary = $canaryHash"
 Mark 'canary-metricas: generando trafico continuo durante el rollout'
 $trafficJob = Start-Job -ScriptBlock {
     param($scriptPath, $ns)
-    & $scriptPath -DurationSeconds 240 -RequestsPerSecond 5 -Namespace $ns
+    & $scriptPath -DurationSeconds 240 -RequestsPerSecond 5 -Namespace $ns -InCluster
 } -ArgumentList (Join-Path $PSScriptRoot 'generar-trafico.ps1'), $Namespace
 
 Mark 'canary-metricas: esperando el resultado del AnalysisRun (debe fallar por metricas del canary)'
