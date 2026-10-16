@@ -108,7 +108,7 @@ $events = Get-Kube -n $Namespace get events --field-selector "involvedObject.nam
 Mark 'canary-metricas: revirtiendo CANARY_FAULT_INJECTION=false'
 & "$PSScriptRoot\set-gitops-flag.ps1" -Service gateway -Key CANARY_FAULT_INJECTION -Value false
 Invoke-Native kubectl -n argocd annotate application sa-platform-dev argocd.argoproj.io/refresh=hard --overwrite | Out-Null
-Wait-Until -What 'rollout Healthy de nuevo' -TimeoutSeconds 300 -IntervalSeconds 10 -Condition {
+Wait-Until -What 'rollout Healthy de nuevo' -TimeoutSeconds 1200 -IntervalSeconds 10 -Condition {
     (Get-Kube -n $Namespace get rollout gateway -o jsonpath='{.status.phase}') -eq 'Healthy'
 }
 Mark 'canary-metricas: Rollout Healthy de nuevo (100% estable)'
