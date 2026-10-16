@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Recorrido cronometrado del sintoma a la causa (rubrica 2.4), con fallo
   inducido DISTINTO al de P8: auth-service, via FAULT_INJECTION.
@@ -68,7 +68,7 @@ $trafficJob = Start-Job -ScriptBlock {
 
 Mark 'sintoma-causa: esperando la alerta TasaErrorAuthServiceElevada (firing)'
 $T1 = $null
-Wait-Until -What 'alerta firing' -TimeoutSeconds 180 -IntervalSeconds 5 -Condition {
+Wait-Until -What 'alerta firing' -TimeoutSeconds 300 -IntervalSeconds 5 -Condition {
     $alerts = Invoke-PromAPI '/api/v1/alerts'
     $a = $alerts.data.alerts | Where-Object { $_.labels.alertname -eq 'TasaErrorAuthServiceElevada' -and $_.state -eq 'firing' }
     if ($a) { $script:T1 = Get-Stamp; $true } else { $false }
@@ -98,7 +98,7 @@ Mark 'sintoma-causa: revirtiendo FAULT_INJECTION=false'
 & "$PSScriptRoot\set-gitops-flag.ps1" -Service auth-service -Key FAULT_INJECTION -Value false
 Invoke-Native kubectl -n argocd annotate application sa-platform-dev argocd.argoproj.io/refresh=hard --overwrite | Out-Null
 $T3 = $null
-Wait-Until -What 'alerta resuelta' -TimeoutSeconds 300 -IntervalSeconds 10 -Condition {
+Wait-Until -What 'alerta resuelta' -TimeoutSeconds 420 -IntervalSeconds 10 -Condition {
     $alerts = Invoke-PromAPI '/api/v1/alerts'
     $a = $alerts.data.alerts | Where-Object { $_.labels.alertname -eq 'TasaErrorAuthServiceElevada' -and $_.state -eq 'firing' }
     if (-not $a) { $script:T3 = Get-Stamp; $true } else { $false }

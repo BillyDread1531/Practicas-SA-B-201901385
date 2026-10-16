@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Punto de entrada unico para levantar el clúster de Practica 10.
 

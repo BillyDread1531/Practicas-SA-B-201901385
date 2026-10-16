@@ -14,9 +14,13 @@ param(
     [Parameter(Mandatory)][string]$Service,     # p.ej. "auth-service" o "gateway"
     [Parameter(Mandatory)][string]$Key,         # p.ej. "FAULT_INJECTION"
     [Parameter(Mandatory)][string]$Value,       # p.ej. "true" / "false"
-    [string]$GitOpsDir = (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'P8-GitOps'),
+    [string]$GitOpsDir,
     [string]$Branch = 'p10'
 )
+# PowerShell 5.1: $PSScriptRoot no esta disponible al evaluar los valores por
+# defecto de los parametros cuando el script tiene parametros Mandatory, asi
+# que ese calculo se hace aqui en el cuerpo en vez de en el param() block.
+if (-not $GitOpsDir) { $GitOpsDir = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'P8-GitOps' }
 . "$PSScriptRoot\common.ps1"
 
 Push-Location $GitOpsDir

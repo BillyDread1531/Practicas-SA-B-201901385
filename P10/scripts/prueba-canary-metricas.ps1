@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Demuestra que el canary del gateway se revierte SOLO, por metricas reales
   de Prometheus, sin intervencion humana (rubrica 2.2 - 16 pts).
