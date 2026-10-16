@@ -35,9 +35,11 @@ spec:
           address: http://prometheus-server.observability.svc.cluster.local
           timeout: 10
           query: |
-            sum(rate(http_requests_total{service="gateway", rollouts_pod_template_hash="{{"{{args.canary-hash}}"}}", status_code=~"5.."}[2m]))
-            /
-            sum(rate(http_requests_total{service="gateway", rollouts_pod_template_hash="{{"{{args.canary-hash}}"}}"}[2m]))
+            scalar(
+              sum(rate(http_requests_total{service="gateway", rollouts_pod_template_hash="{{"{{args.canary-hash}}"}}", status_code=~"5.."}[2m]))
+              /
+              sum(rate(http_requests_total{service="gateway", rollouts_pod_template_hash="{{"{{args.canary-hash}}"}}"}[2m]))
+            )
 
     - name: latencia-p95
       interval: 15s
@@ -52,6 +54,8 @@ spec:
           address: http://prometheus-server.observability.svc.cluster.local
           timeout: 10
           query: |
-            histogram_quantile(0.95,
-              sum(rate(http_request_duration_seconds_bucket{service="gateway", rollouts_pod_template_hash="{{"{{args.canary-hash}}"}}"}[2m])) by (le)
+            scalar(
+              histogram_quantile(0.95,
+                sum(rate(http_request_duration_seconds_bucket{service="gateway", rollouts_pod_template_hash="{{"{{args.canary-hash}}"}}"}[2m])) by (le)
+              )
             )
