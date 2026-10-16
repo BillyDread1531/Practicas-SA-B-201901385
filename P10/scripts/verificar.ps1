@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Verifica que el stack de observabilidad y el flujo de P8 estan sanos.
   Termina con codigo distinto de 0 si algun control falla.
@@ -38,12 +38,28 @@ Check 'GitOps: app-of-apps y aplicaciones hijas' {
     ($list | ForEach-Object { "$($_.metadata.name)=$($_.status.sync.status)" })
 }
 
+# PowerShell 5.1 descarta un "--" suelto al separar argumentos de un
+# ejecutable nativo via splat (@args), asi que "kubectl exec POD -- CMD"
+# nunca llega completo. En vez de pelear con eso, se usa port-forward +
+# Invoke-RestMethod (mismo patron que prueba-sintoma-causa.ps1), que no
+# depende en absoluto de pasar argumentos a traves de kubectl exec.
+function Invoke-ObservabilityAPI {
+    param([string]$Service, [int]$RemotePort, [string]$Path)
+    $pf = Start-PortForward -Namespace observability -Service $Service -LocalPort 19500 -RemotePort $RemotePort
+    try {
+        return Invoke-RestMethod -Uri "http://127.0.0.1:19500$Path" -TimeoutSec 10
+    } finally { Stop-Process -Id $pf.Id -Force -ErrorAction SilentlyContinue }
+}
+
 Check 'Instrumentacion: Prometheus esta recolectando metricas de los 3 servicios' {
-    $targets = Get-Kube -n observability exec deploy/prometheus-server -c prometheus-server -- wget -qO- http://localhost:9090/api/v1/targets
-    $j = $targets | ConvertFrom-Json
-    $up = @($j.data.activeTargets | Where-Object { $_.labels.service -in @('gateway', 'auth-service', 'cursos-service') -and $_.health -eq 'up' })
-    if ($up.Count -lt 3) { throw "solo $($up.Count)/3 servicios con targets 'up' en Prometheus" }
-    "$($up.Count) targets up: $(($up.labels.service | Select-Object -Unique) -join ', ')"
+    # El target-discovery solo trae labels de Kubernetes (pod, namespace); la
+    # etiqueta "service" es parte de los DATOS de la metrica (prom-client),
+    # no del target. Se identifica el servicio por el prefijo del nombre del pod.
+    $j = Invoke-ObservabilityAPI -Service prometheus-server -RemotePort 80 -Path '/api/v1/targets'
+    $sap8 = @($j.data.activeTargets | Where-Object { $_.labels.namespace -eq $Namespace -and $_.health -eq 'up' })
+    $svcs = @('gateway', 'auth-service', 'cursos-service') | Where-Object { $svc = $_; $sap8 | Where-Object { $_.labels.pod -like "$svc-*" } }
+    if (@($svcs).Count -lt 3) { throw "solo $(@($svcs).Count)/3 servicios con targets 'up' en Prometheus ($($sap8.Count) pods up en total)" }
+    "$(@($svcs).Count)/3 servicios con target up: $($svcs -join ', ')"
 }
 
 Check 'Canary por metricas: AnalysisTemplate consulta Prometheus (no un Job sintetico)' {
@@ -54,8 +70,7 @@ Check 'Canary por metricas: AnalysisTemplate consulta Prometheus (no un Job sint
 }
 
 Check 'SLO: reglas de registro calculando indicador y presupuesto' {
-    $rules = Get-Kube -n observability exec deploy/prometheus-server -c prometheus-server -- wget -qO- http://localhost:9090/api/v1/rules
-    $j = $rules | ConvertFrom-Json
+    $j = Invoke-ObservabilityAPI -Service prometheus-server -RemotePort 80 -Path '/api/v1/rules'
     $names = @($j.data.groups | ForEach-Object { $_.rules } | ForEach-Object { $_.name })
     $need = @('sli:gateway_availability:ratio_rate1h', 'slo:gateway_availability:error_budget_burn1h', 'sli:gateway_latency:p95_5m', 'slo:gateway_latency:error_budget_burn1h')
     $missing = @($need | Where-Object { $_ -notin $names })
@@ -64,8 +79,7 @@ Check 'SLO: reglas de registro calculando indicador y presupuesto' {
 }
 
 Check 'Alertas: reglas cargadas y enlazadas a un runbook' {
-    $rules = Get-Kube -n observability exec deploy/prometheus-server -c prometheus-server -- wget -qO- http://localhost:9090/api/v1/rules
-    $j = $rules | ConvertFrom-Json
+    $j = Invoke-ObservabilityAPI -Service prometheus-server -RemotePort 80 -Path '/api/v1/rules'
     $alerts = @($j.data.groups | ForEach-Object { $_.rules } | Where-Object { $_.type -eq 'alerting' })
     if ($alerts.Count -eq 0) { throw 'sin reglas de alerta cargadas' }
     $sinRunbook = @($alerts | Where-Object { -not $_.annotations.runbook_url })
@@ -73,18 +87,20 @@ Check 'Alertas: reglas cargadas y enlazadas a un runbook' {
     "$($alerts.Count) alertas, todas con runbook_url"
 }
 
+Mark 'verificar: generando trafico real (login/cursos) para que haya logs y trazas que verificar'
+& "$PSScriptRoot\generar-trafico.ps1" -DurationSeconds 15 -RequestsPerSecond 3 -Namespace $Namespace
+Start-Sleep -Seconds 5
+
 Check 'Registros estructurados: Loki tiene logs JSON con trace_id' {
     $q = [uri]::EscapeDataString('{namespace="sa-p8"} | json | trace_id != ""')
-    $resp = Get-Kube -n observability exec deploy/loki -- wget -qO- "http://localhost:3100/loki/api/v1/query_range?query=$q&limit=1"
-    $j = $resp | ConvertFrom-Json
+    $j = Invoke-ObservabilityAPI -Service loki -RemotePort 3100 -Path "/loki/api/v1/query_range?query=$q&limit=1"
     $count = @($j.data.result).Count
     if ($count -eq 0) { throw 'sin resultados con trace_id en Loki (puede que aun no haya trafico; generar trafico y reintentar)' }
     "$count stream(s) con trace_id encontrados"
 }
 
 Check 'Trazas: Tempo tiene spans recientes' {
-    $resp = Get-Kube -n observability exec deploy/tempo -- wget -qO- "http://localhost:3100/api/search?tags=&limit=1"
-    $j = $resp | ConvertFrom-Json
+    $j = Invoke-ObservabilityAPI -Service tempo -RemotePort 3200 -Path '/api/search?tags=&limit=1'
     if (@($j.traces).Count -eq 0) { throw 'sin trazas en Tempo todavia (generar trafico y reintentar)' }
     "al menos 1 traza encontrada"
 }

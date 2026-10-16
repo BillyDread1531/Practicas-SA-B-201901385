@@ -50,7 +50,8 @@ try {
 
     Set-Content -Path $path -Value $out -Encoding UTF8
     Invoke-Native git add $path
-    $hasDiff = (git diff --cached --quiet; $LASTEXITCODE -ne 0)
+    git diff --cached --quiet
+    $hasDiff = ($LASTEXITCODE -ne 0)
     if (-not $hasDiff) { Mark "set-gitops-flag: ${Service}.${Key} ya era $Value, sin cambios"; return }
     Invoke-Native git commit -m "chore(p10): ${Service}.${Key}=${Value} (prueba automatizada)" -m "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
     Invoke-Native git push origin $Branch
