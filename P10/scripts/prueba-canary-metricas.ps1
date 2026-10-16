@@ -33,6 +33,12 @@ $revisionBefore = $rolloutBefore.status.currentPodHash
 Mark "canary-metricas: revision estable actual = $revisionBefore"
 
 Mark 'canary-metricas: activando CANARY_FAULT_INJECTION=true en el gateway'
+# Nonce unico por corrida: si el ConfigMap quedara con el mismo contenido de
+# una corrida anterior, el pod-template-hash del canary seria IDENTICO y
+# Argo Rollouts reutilizaria la revision y el AnalysisRun ya concluido del
+# historial en vez de medir trafico real otra vez (asi se descubrio este
+# bug: un AnalysisRun "Inconclusive" con startedAt de minutos antes).
+& "$PSScriptRoot\set-gitops-flag.ps1" -Service gateway -Key CANARY_TEST_NONCE -Value ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
 & "$PSScriptRoot\set-gitops-flag.ps1" -Service gateway -Key CANARY_FAULT_INJECTION -Value true
 $tStart = Get-Stamp
 Invoke-Native kubectl -n argocd annotate application sa-platform-dev argocd.argoproj.io/refresh=hard --overwrite | Out-Null
