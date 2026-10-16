@@ -30,6 +30,11 @@ spec:
                 - kyverno
                 - velero
                 - argo-rollouts
+                # Practica 10: stack de observabilidad. Varios de estos charts
+                # (Alertmanager, Prometheus) traen sidecars (configmap-reload)
+                # cuyos recursos no se fijan uno por uno bajo presion de
+                # tiempo; es infraestructura de terceros, no la aplicacion de P8.
+                - observability
       validate:
         message: "Cada contenedor debe definir requests y limits de CPU y memoria."
         foreach:

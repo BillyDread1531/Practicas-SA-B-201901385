@@ -30,6 +30,11 @@ spec:
                 - kyverno
                 - velero
                 - argo-rollouts
+                # Practica 10: stack de observabilidad (Prometheus, Grafana,
+                # Loki, Tempo, Promtail, OTel Collector). Igual que los
+                # anteriores, es infraestructura de terceros via Helm, no la
+                # aplicacion bajo la cadena de suministro de P8.
+                - observability
       validate:
         message: "Los contenedores deben ejecutarse como usuario no root."
         foreach:

@@ -28,28 +28,44 @@ spec:
         - setWeight: 20
         - analysis:
             templates:
-              - templateName: gateway-health
+              - templateName: gateway-metrics
+            args:
+              - name: canary-hash
+                valueFrom:
+                  podTemplateHashValue: Canary
         - pause:
             duration: 20s
 
         - setWeight: 50
         - analysis:
             templates:
-              - templateName: gateway-health
+              - templateName: gateway-metrics
+            args:
+              - name: canary-hash
+                valueFrom:
+                  podTemplateHashValue: Canary
         - pause:
             duration: 20s
 
         - setWeight: 80
         - analysis:
             templates:
-              - templateName: gateway-health
+              - templateName: gateway-metrics
+            args:
+              - name: canary-hash
+                valueFrom:
+                  podTemplateHashValue: Canary
         - pause:
             duration: 20s
 
         - setWeight: 100
         - analysis:
             templates:
-              - templateName: gateway-health
+              - templateName: gateway-metrics
+            args:
+              - name: canary-hash
+                valueFrom:
+                  podTemplateHashValue: Canary
 
   template:
     metadata:
@@ -58,6 +74,14 @@ spec:
         app.kubernetes.io/name: gateway
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        # Practica 10: con esto Prometheus descubre tanto los pods estables
+        # como los canary (cada revision trae su propia etiqueta
+        # rollouts-pod-template-hash, que el job kubernetes-pods promueve a
+        # etiqueta de metrica; asi el AnalysisTemplate puede filtrar SOLO
+        # por el canary).
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.service.targetPort }}"
+        prometheus.io/path: "/metrics"
 
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}

@@ -1,5 +1,7 @@
 const express = require("express");
 const pool = require("../config/db");
+const logger = require("../telemetry/logger");
+const { cursosCreadosTotal } = require("../telemetry/metrics");
 
 const router = express.Router();
 
@@ -11,7 +13,7 @@ router.get("/", async (req, res) => {
 
     res.json(resultado.rows);
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error.message, msg: "error al obtener los cursos" });
 
     res.status(500).json({
       mensaje: "Error al obtener los cursos",
@@ -36,12 +38,16 @@ router.post("/", async (req, res) => {
       [nombre, descripcion || null, creditos || null]
     );
 
+    cursosCreadosTotal.inc();
+
+    logger.info({ curso: resultado.rows[0], msg: "curso creado" });
+
     res.status(201).json({
       mensaje: "Curso creado correctamente",
       curso: resultado.rows[0],
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error.message, msg: "error al crear el curso" });
 
     res.status(500).json({
       mensaje: "Error al crear el curso",

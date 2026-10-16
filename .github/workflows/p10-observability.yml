@@ -1,0 +1,81 @@
+name: P10 Observabilidad - build y push a GHCR
+
+# Construye las imagenes instrumentadas con OpenTelemetry y las publica en
+# GitHub Container Registry (ghcr.io), NO en Azure Container Registry.
+# ghcr.io es gratuito para paquetes publicos: evita el costo fijo de ACR
+# (~US$5/mes por existir, sin importar el uso) para una practica que solo
+# necesita el cluster encendido unas horas.
+#
+# Workflow independiente del de P8 (p8-secure-gitops.yml): ese sigue
+# intacto, publicando en ACR, por si se necesita mas adelante. Este solo
+# toca P5/* (codigo fuente) y P10/* (infraestructura y documentacion).
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "P5/**"
+      - ".github/workflows/p10-observability.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/billydread1531
+
+jobs:
+  build:
+    name: Build y publicar
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - image: auth-service
+            context: P5/auth-service
+          - image: cursos-service
+            context: P5/cursos-service
+          - image: gateway
+            context: P5/gateway
+          - image: estudiantes-service
+            context: P5/estudiantes-service
+          - image: inscripciones-service
+            context: P5/inscripciones-service
+          - image: cronjobs
+            context: P5/cronjobs
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        shell: bash
+        run: |
+          VERSION="p10-${GITHUB_SHA::7}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:${{ steps.version.outputs.version }}
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:p10-latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

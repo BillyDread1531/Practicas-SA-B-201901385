@@ -2,8 +2,26 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const pool = require("../config/db");
+const logger = require("../telemetry/logger");
+const { usuariosRegistradosTotal } = require("../telemetry/metrics");
 
 const router = express.Router();
+
+// ---------------------------------------------------------------------------
+// Inyeccion de fallo para la Practica 10 (distinta a la de la Practica 8).
+// Se activa SOLO poniendo FAULT_INJECTION=true en el ConfigMap del Helm
+// chart; como eso cambia el checksum/config del pod template, Argo Rollouts
+// lo despliega como una revision nueva (canary) sin tocar los pods estables
+// de la revision anterior. Asi el fallo queda aislado al canary y el
+// AnalysisTemplate por Prometheus lo mide SOLO ahi.
+// ---------------------------------------------------------------------------
+const FAULT_INJECTION = process.env.FAULT_INJECTION === "true";
+const FAULT_ERROR_RATE = Number(process.env.FAULT_ERROR_RATE || 0.4);
+const FAULT_EXTRA_LATENCY_MS = Number(process.env.FAULT_EXTRA_LATENCY_MS || 1500);
+
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 router.post("/register", async (req, res) => {
   try {
@@ -35,12 +53,16 @@ router.post("/register", async (req, res) => {
       [email, passwordHash]
     );
 
+    usuariosRegistradosTotal.inc();
+
+    logger.info({ email, msg: "usuario registrado" });
+
     res.status(201).json({
       mensaje: "Usuario registrado correctamente",
       usuario: resultado.rows[0],
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error.message, msg: "error en /auth/register" });
 
     res.status(500).json({
       mensaje: "Error interno del servidor",
@@ -56,6 +78,19 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({
         mensaje: "Email y password son obligatorios",
       });
+    }
+
+    if (FAULT_INJECTION) {
+      await sleep(FAULT_EXTRA_LATENCY_MS);
+      if (Math.random() < FAULT_ERROR_RATE) {
+        logger.error({
+          email,
+          msg: "fallo inducido (FAULT_INJECTION) en /auth/login",
+        });
+        return res.status(500).json({
+          mensaje: "Error interno del servidor",
+        });
+      }
     }
 
     const resultado = await pool.query(
@@ -93,12 +128,14 @@ router.post("/login", async (req, res) => {
       }
     );
 
+    logger.info({ email, msg: "inicio de sesion correcto" });
+
     res.json({
       mensaje: "Inicio de sesión correcto",
       token,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error.message, msg: "error en /auth/login" });
 
     res.status(500).json({
       mensaje: "Error interno del servidor",

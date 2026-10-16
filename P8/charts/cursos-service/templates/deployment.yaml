@@ -29,6 +29,9 @@ spec:
         app.kubernetes.io/name: cursos-service
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.service.targetPort }}"
+        prometheus.io/path: "/metrics"
 
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}

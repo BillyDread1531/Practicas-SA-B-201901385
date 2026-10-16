@@ -23,4 +23,4 @@ USER node
 
 EXPOSE 3002
 
-CMD ["node", "src/index.js"]
+CMD ["node", "--require", "./src/telemetry/instrumentation.js", "src/index.js"]

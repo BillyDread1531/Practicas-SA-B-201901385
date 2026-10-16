@@ -1,18 +1,60 @@
 {{- $global := .Values.global | default (dict) -}}
+# ---------------------------------------------------------------------------
+# Practica 10 - requisito 2.2: el analisis del canary ya NO ejecuta un Job de
+# pruebas sinteticas contra /health (eso era P8). Ahora consulta Prometheus
+# con metricas REALES del trafico que recibe la version candidata: tasa de
+# error y percentil 95 de latencia, medidas SOLO sobre los pods canary
+# (filtrados por rollouts-pod-template-hash, que Argo Rollouts inyecta como
+# argumento {{"{{args.canary-hash}}"}} en cada paso del Rollout).
+#
+# Esto cierra el pendiente deliberado de P8: la promocion depende del
+# comportamiento real del sistema bajo trafico de usuarios, no de un script
+# que el propio estudiante escribio.
+# ---------------------------------------------------------------------------
 apiVersion: argoproj.io/v1alpha1
 kind: AnalysisTemplate
 metadata:
-  name: gateway-health
+  name: gateway-metrics
   namespace: {{ $global.namespace | default "sa-p8" }}
 spec:
+  args:
+    - name: canary-hash
+
   metrics:
-    - name: gateway-health
-      interval: 10s
-      count: 3
-      failureLimit: 0
-      successCondition: 'result == "ok"'
+    - name: tasa-de-error
+      # 5 mediciones cada 15s = 75s de observacion por paso del canary.
+      interval: 15s
+      count: 5
+      failureLimit: 1
+      # Exito si el error rate del canary es menor al 10%. El fallo inducido
+      # (CANARY_FAULT_INJECTION) produce ~50%, muy por encima del umbral.
+      successCondition: result < 0.10
+      failureCondition: result >= 0.10
       provider:
-        web:
-          url: "http://{{ include "gateway.fullname" . }}-canary.{{ $global.namespace | default "sa-p8" }}.svc.cluster.local:{{ .Values.service.port }}/health"
-          timeoutSeconds: 5
-          jsonPath: "{$.status}"
+        prometheus:
+          address: http://prometheus-server.observability.svc.cluster.local
+          timeout: 10
+          query: |
+            clamp_max(
+              sum(rate(http_requests_total{service="gateway", rollouts_pod_template_hash="{{"{{args.canary-hash}}"}}", status_code=~"5.."}[2m]) or vector(0))
+              /
+              (sum(rate(http_requests_total{service="gateway", rollouts_pod_template_hash="{{"{{args.canary-hash}}"}}"}[2m]) or vector(0)) + 0.001),
+              1
+            )
+
+    - name: latencia-p95
+      interval: 15s
+      count: 5
+      failureLimit: 1
+      # Exito si el p95 del canary es menor a 1 segundo. El fallo inducido
+      # agrega 2000ms fijos, muy por encima del umbral.
+      successCondition: result < 1
+      failureCondition: result >= 1
+      provider:
+        prometheus:
+          address: http://prometheus-server.observability.svc.cluster.local
+          timeout: 10
+          query: |
+            histogram_quantile(0.95,
+              sum(rate(http_request_duration_seconds_bucket{service="gateway", rollouts_pod_template_hash="{{"{{args.canary-hash}}"}}"}[2m]) or vector(0)) by (le)
+            )

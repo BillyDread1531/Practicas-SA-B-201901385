@@ -3,18 +3,60 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const jwt = require("jsonwebtoken");
 const { createProxyMiddleware } = require("http-proxy-middleware");
+const logger = require("./telemetry/logger");
+const { register, metricsMiddleware } = require("./telemetry/metrics");
 
 dotenv.config();
 
 const app = express();
 
+// ---------------------------------------------------------------------------
+// Inyeccion de fallo para la Practica 10 (distinta a la de P8 y a la del
+// toggle de auth-service: esta es la que gobierna la demo del CANARY, porque
+// el gateway es el unico Rollout con analysis de Argo Rollouts).
+//
+// Se activa SOLO cambiando CANARY_FAULT_INJECTION=true en el ConfigMap del
+// chart del gateway. Eso cambia el checksum/config del pod template, Argo
+// Rollouts lo trata como una revision nueva (canary) y SOLO esos pods nuevos
+// quedan con el fallo activo; los pods estables de la revision anterior
+// conservan su configuracion original. El AnalysisTemplate mide error-rate
+// y p95 de latencia filtrando por el hash de esa revision (canary), asi que
+// detecta el fallo sin tocar el trafico estable.
+// ---------------------------------------------------------------------------
+const CANARY_FAULT_INJECTION = process.env.CANARY_FAULT_INJECTION === "true";
+const CANARY_FAULT_ERROR_RATE = Number(process.env.CANARY_FAULT_ERROR_RATE || 0.5);
+const CANARY_FAULT_LATENCY_MS = Number(process.env.CANARY_FAULT_LATENCY_MS || 2000);
+
+function chaosMiddleware(req, res, next) {
+  if (!CANARY_FAULT_INJECTION || req.path === "/health" || req.path === "/metrics") {
+    return next();
+  }
+  setTimeout(() => {
+    if (Math.random() < CANARY_FAULT_ERROR_RATE) {
+      logger.error({
+        path: req.path,
+        msg: "fallo inducido (CANARY_FAULT_INJECTION) en el gateway",
+      });
+      return res.status(503).json({ mensaje: "Servicio no disponible" });
+    }
+    next();
+  }, CANARY_FAULT_LATENCY_MS);
+}
+
 app.use(cors());
+app.use(metricsMiddleware("gateway"));
+app.use(chaosMiddleware);
 
 app.get("/health", (req, res) => {
   res.status(200).json({
     status: "ok",
     service: "gateway",
   });
+});
+
+app.get("/metrics", async (req, res) => {
+  res.set("Content-Type", register.contentType);
+  res.end(await register.metrics());
 });
 
 // Ruta pública del Gateway
@@ -107,5 +149,5 @@ app.use(
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`API Gateway ejecutándose en puerto ${PORT}`);
+  logger.info({ msg: `API Gateway ejecutándose en puerto ${PORT}` });
 });

@@ -28,6 +28,11 @@ spec:
         app.kubernetes.io/name: auth-service
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        # Practica 10: descubrimiento de Prometheus (ver scrape_configs del
+        # job "kubernetes-pods" en el Application de prometheus del GitOps).
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.service.targetPort }}"
+        prometheus.io/path: "/metrics"
 
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}
