@@ -1,12 +1,12 @@
 ﻿# Continuidad de los secretos - evidencia (generada por scripts/evidencia-continuidad.ps1)
 
 Mecanismo: **Sealed Secrets con respaldo de la llave en Azure Key Vault** (externo al cluster) y restauracion
-automatica por Terraform. Consulta hecha el 2026-09-24T09:30:34Z UTC sobre el cluster reconstruido. No se imprime ninguna llave.
+automatica por Terraform. Consulta hecha el 2026-10-16T08:43:01Z UTC sobre el cluster reconstruido. No se imprime ninguna llave.
 
 ## Como funciona
 
 1. Las llaves privadas del controlador se respaldan con `scripts/backup-sealed-key.ps1` en el Key Vault
-   `kv-p9-201901385` (secreto `sealed-secrets-keys`, actualizado 2026-09-24T07:10:34+00:00). El Key Vault esta en la capa persistente
+   `kv-p9-201901385` (secreto `sealed-secrets-keys`, actualizado 2026-10-16T07:42:55+00:00). El Key Vault esta en la capa persistente
    (`rg-sa-p9-backend`), fuera del cluster y fuera del estado de Terraform que se destruye.
 2. En el bootstrap, `P9/terraform/sealed-secrets-key.tf` lee el secreto y crea los `Secret` de llave en `kube-system`
    **antes** de que ArgoCD cree la aplicacion raiz (dependencia explicita en `bootstrap.tf`), de modo que el controlador
@@ -27,7 +27,7 @@ Se compara la huella SHA-256 del certificado publico (`tls.crt`) de cada llave e
 
 | Comprobacion | Resultado |
 |---|---|
-| `SealedSecret/sa-platform-secrets` (namespace `sa-p8`) | condicion `Synced` = **True** desde 2026-09-24T09:16:47Z |
+| `SealedSecret/sa-platform-secrets` (namespace `sa-p8`) | condicion `Synced` = **True** desde 2026-10-16T08:34:07Z |
 | `Secret/sa-platform-secrets` generado por el controlador | existe; claves: DB_PASSWORD, DB_USER, JWT_SECRET, password, postgres-password, RABBITMQ_ERLANG_COOKIE, RABBITMQ_PASSWORD, RABBITMQ_USERNAME, rabbitmq-erlang-cookie, rabbitmq-password |
 | Propietario del Secret | `SealedSecret/sa-platform-secrets` |
 | Errores `no key could decrypt` en el log del controlador (ultimas 1000 lineas) | **0** |
@@ -36,9 +36,9 @@ Se compara la huella SHA-256 del certificado publico (`tls.crt`) de cada llave e
 Fragmento del log del controlador (sin valores secretos):
 
 ```
-time=2026-09-24T09:28:28.286Z level=INFO msg="Searching for existing private [...]
-time=2026-09-24T09:28:28.331Z level=INFO msg="registered private [...]
-time=2026-09-24T09:28:28.332Z level=INFO msg="registered private [...]
-time=2026-09-24T09:28:28.433Z level=INFO msg=Updating key=sa-p8/sa-platform-secrets
-time=2026-09-24T09:28:28.499Z level=INFO msg="Event(v1.ObjectReference{Kind:\"SealedSecret\", Namespace:\"sa-p8\", Name:\"sa-platform-secrets\", UID:\"24cb76cb-e700-4f49-973f-f8bf7033c945\", APIVersion:\"bitnami.com/v1alpha1\", ResourceVersion:\"3993\", FieldPath:\"\"}): type: 'Normal' reason: 'Unsealed' SealedSecret unsealed successfully"
+time=2026-10-16T08:33:45.544Z level=INFO msg="Searching for existing private [...]
+time=2026-10-16T08:33:45.818Z level=INFO msg="registered private [...]
+time=2026-10-16T08:33:45.819Z level=INFO msg="registered private [...]
+time=2026-10-16T08:34:07.413Z level=INFO msg=Updating key=sa-p8/sa-platform-secrets
+time=2026-10-16T08:34:07.631Z level=INFO msg="Event(v1.ObjectReference{Kind:\"SealedSecret\", Namespace:\"sa-p8\", Name:\"sa-platform-secrets\", UID:\"e42bc450-8646-4790-9845-ff7d61f06bf8\", APIVersion:\"bitnami.com/v1alpha1\", ResourceVersion:\"3464\", FieldPath:\"\"}): type: 'Normal' reason: 'Unsealed' SealedSecret unsealed successfully"
 ```

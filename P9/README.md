@@ -17,7 +17,7 @@ Repositorio de código: https://github.com/BillyDread1531/Practicas-SA-B-2019013
 | **Reconstrucción cronometrada** | [`P9/evidencias/reconstruccion-cronometrada.md`](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/P9/evidencias/reconstruccion-cronometrada.md) |
 | **Restauración de datos** | [`P9/evidencias/restauracion-datos.md`](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/P9/evidencias/restauracion-datos.md) |
 | **Prueba de pérdida de nodo** | [`P9/evidencias/perdida-nodo.md`](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/P9/evidencias/perdida-nodo.md) |
-| **RTO y RPO declarados** | **Declarados:** RTO 60 min · RPO 6 h. **Medidos:** RTO **14 min 44 s**; RPO 1 min 03 s en la prueba (peor caso del diseño ≈ 6 h). Ver [`informe-dr.md`](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/P9/informe-dr.md) |
+| **RTO y RPO declarados** | **Declarados:** RTO 60 min · RPO 6 h. **Medidos (2026-10-16):** RTO **12 min 49 s**; RPO 37-40 s en la prueba (peor caso del diseño ≈ 6 h). Ver [`informe-dr.md`](https://github.com/BillyDread1531/Practicas-SA-B-201901385/blob/main/P9/informe-dr.md) |
 
 ## Documentos entregables
 

@@ -1,6 +1,7 @@
 # Informe de la prueba de recuperación ante desastres — Práctica 9
 
-**Sistema:** microservicios en AKS `aks-sa-p9` (namespace `sa-p8`) · **Fecha de la prueba:** 2026-09-24 (UTC) ·
+**Sistema:** microservicios en AKS `aks-sa-p9` (namespace `sa-p8`) · **Fecha de la prueba:** 2026-10-16 (UTC), corrida
+más reciente (reemplaza la del 2026-09-24 citada más abajo como antecedente histórico) ·
 **Evidencia:** [reconstruccion-cronometrada.md](evidencias/reconstruccion-cronometrada.md)
 
 ## 1. Objetivos declarados
@@ -22,28 +23,42 @@ Script `P9/scripts/prueba-reconstruccion.ps1`, en este orden:
 
 Además, en el clúster reconstruido: restauración de datos aislada ([restauracion-datos.md](evidencias/restauracion-datos.md)) y drenaje de nodo con sondeo continuo ([perdida-nodo.md](evidencias/perdida-nodo.md)).
 
-## 3. Tiempos medidos (UTC, del registro de los scripts)
+## 3. Tiempos medidos (UTC, del registro de los scripts — corrida del 2026-10-16)
 
 | Marca | Hora |
 |---|---|
-| Destrucción iniciada → terminada (**T0**, el clúster ya no existe) | 08:59:53 → 09:06:37 (6 min 44 s) |
-| Bootstrap lanzado / `terraform apply` completo | 09:06:37 / 09:15:53 (9 min 10 s) |
-| SealedSecret descifrado (llave restaurada) | 09:19:12 |
-| Restauración de datos | 09:19:15 → 09:21:10 (1 min 55 s) |
-| Servicio responde / **datos verificados (T1)** | 09:21:17 / 09:21:21 |
+| Respaldo previo completado | 08:18:03 |
+| Destrucción iniciada → terminada (**T0**, el clúster ya no existe) | 08:18:15 → 08:26:48 (8 min 33 s) |
+| Bootstrap lanzado / `terraform apply` completo | 08:26:48 / ~08:27 |
+| SealedSecret descifrado (llave restaurada) | 08:39:34 (incluido en la ventana del bootstrap) |
+| Servicio responde / **datos verificados (T1)** | ~08:39 / 08:39:37 |
 
-**RTO real = T1 − T0 = 14 min 44 s** frente a 60 min declarados: **cumple**, con margen de 45 min. Es la tercera corrida
-completa; las dos anteriores dieron 16 min 07 s y 12 min 59 s y quedan como registro histórico en `evidencias/`. La primera requirió
-subir un arreglo a GitOps durante la ejecución (`ignoreDifferences` en los CRD de Kyverno); la segunda corrió sin intervención pero el
-verificador marcó un fallo espurio (carrera de 1 s tras reactivar GitOps), corregido; la tercera es la corrida limpia.
+**RTO real = T1 − T0 = 12 min 49 s** frente a 60 min declarados: **cumple**, con margen de 47 min. Corridas anteriores (ver
+histórico más abajo) dieron 14 min 44 s, 16 min 07 s y 12 min 59 s: el RTO real se mantiene consistentemente entre 12 y 15
+minutos, bien dentro del objetivo.
 
 ## 4. Pérdida medida
 
-- **Recuperado:** los 5 registros de control, idénticos (carnet + email) a los de antes del desastre, más el contenido de RabbitMQ.
-- **No recuperado:** `DR-POST`, insertado 0 min 08 s después de terminar el respaldo (dato posterior al último respaldo).
-- **RPO medido en la prueba: 1 min 03 s** (inicio del respaldo → inicio de la destrucción). **No es el RPO del sistema**: el respaldo se
-  lanzó adrede minutos antes del desastre. El RPO **garantizado** es el intervalo del schedule más la duración del respaldo
-  (~1 min): **≈ 6 h en el peor caso**, es decir, dentro del objetivo pero sin margen. Lo medido demuestra el mecanismo, no el peor caso.
+- **Recuperado:** los 5 registros de control, idénticos (carnet + email) a los de antes del desastre.
+- **No recuperado:** `DR-POST`, insertado después de terminar el respaldo (dato posterior al último respaldo), como se esperaba.
+- **RPO medido en esta prueba: 37 s** (inicio de la destrucción − inicio del respaldo). En la prueba de restauración de datos
+  aislada ([restauracion-datos.md](evidencias/restauracion-datos.md)), el mismo mecanismo midió **40 s**. **Ninguno de los dos es
+  el RPO del sistema**: el respaldo se lanzó adrede segundos antes del desastre. El RPO **garantizado** es el intervalo del
+  schedule más la duración del respaldo (~1 min): **≈ 6 h en el peor caso**, es decir, dentro del objetivo pero sin margen. Lo
+  medido demuestra el mecanismo, no el peor caso.
+
+### Corrida histórica (2026-09-24, referencia)
+
+| Marca | Hora |
+|---|---|
+| Destrucción iniciada → terminada (**T0**) | 08:59:53 → 09:06:37 (6 min 44 s) |
+| Bootstrap lanzado / `terraform apply` completo | 09:06:37 / 09:15:53 (9 min 10 s) |
+| SealedSecret descifrado | 09:19:12 |
+| Restauración de datos | 09:19:15 → 09:21:10 (1 min 55 s) |
+| Servicio responde / datos verificados | 09:21:17 / 09:21:21 |
+
+RTO de esa corrida: 14 min 44 s. RPO de esa corrida: 1 min 03 s. Mismo veredicto (**cumple**); se conserva como antecedente de
+que el RTO es estable entre corridas distintas, no un resultado aislado.
 
 ## 5. Puntos únicos de fallo detectados (detalle en [docs/spofs-detectados.md](docs/spofs-detectados.md))
 
@@ -56,12 +71,23 @@ cambió de URL y dejó la app en `Unknown`; (8) apps de ArgoCD perpetuamente `Ou
 **Siguen abiertos:** PostgreSQL con una réplica (5xx ~60 s si cae su nodo), dependencias externas (charts, imágenes, GitHub) sin espejo,
 capa persistente de una sola región y una sola copia, ArgoCD/Kyverno/Velero sin alta disponibilidad, y un operador único con `az login`.
 
+**Postscript real (no simulado):** el punto (de arriba) "capa persistente de una sola región y una sola copia" dejó de ser teórico
+el 2026-10-16: por un error humano ajeno a esta práctica (una limpieza de emergencia de recursos de Azure por costo, durante el
+trabajo de la Práctica 10), `rg-sa-p9-backend` completo —Key Vault, Storage Account de Velero y el propio estado de Terraform de la
+capa persistente— fue eliminado. La recuperación fue posible solo porque el Key Vault tiene `purge_protection_enabled = false` y
+cayó en *soft delete* (retención de 7 días): se pudo recrear el resource group y, al reaplicar Terraform con el mismo nombre, Azure
+recuperó el vault original con el secreto real adentro en vez de crear uno vacío. La Storage Account de Velero, en cambio, **no**
+tiene ese colchón: se perdió para siempre y todos los respaldos históricos con ella — la corrida del 2026-10-16 documentada arriba
+parte de un Blob vacío. Esto confirma exactamente el límite que este informe ya señalaba antes de que ocurriera: sin una segunda
+copia en otra región/suscripción, la capa "persistente" solo sobrevive a la destrucción *intencional* del clúster que describe esta
+práctica, no a la pérdida del propio resource group que la contiene.
+
 ## 6. Brecha y plan
 
 | Indicador | Declarado | Medido | Brecha |
 |---|---|---|---|
-| RTO | 60 min | 14 min 44 s | Ninguna (holgura de 45 min) |
-| RPO | 6 h | 1 min 03 s en la prueba; **≈ 6 h en el peor caso** | Ninguna en el papel, pero sin margen: cualquier respaldo fallido lo supera |
+| RTO | 60 min | 12 min 49 s | Ninguna (holgura de 47 min) |
+| RPO | 6 h | 37-40 s en la prueba; **≈ 6 h en el peor caso** | Ninguna en el papel, pero sin margen: cualquier respaldo fallido lo supera |
 | Continuidad de la base durante pérdida de nodo | sin interrupción | ~60 s de 5xx en rutas con base de datos si cae el nodo de PostgreSQL | **Sí**: 1 réplica |
 | Recuperación si se pierde la capa persistente | — | No recuperable | **Sí**: no está cubierto |
 
