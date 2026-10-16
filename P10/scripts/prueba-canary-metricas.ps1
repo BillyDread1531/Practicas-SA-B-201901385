@@ -70,8 +70,13 @@ Mark 'canary-metricas: esperando el resultado del AnalysisRun (debe fallar por m
 $analysisRun = $null
 $outcome = $null
 Wait-Until -What 'AnalysisRun concluido' -TimeoutSeconds ($TimeoutMinutes * 60) -IntervalSeconds 5 -Condition {
+    # OJO: la etiqueta real que pone Argo Rollouts es "rollouts-pod-template-hash"
+    # (con "s"), no "rollout-pod-template-hash". Con el typo, este filtro nunca
+    # matcheaba nada y el script terminaba aceptando CUALQUIER AnalysisRun del
+    # Rollout "gateway" (incluyendo corridas viejas ya concluidas de pasos
+    # anteriores), dando por bueno un resultado que no era el de esta corrida.
     $runs = @((Get-Kube -n $Namespace get analysisrun -o json | ConvertFrom-Json).items |
-        Where-Object { $_.metadata.labels.'rollout-pod-template-hash' -eq $canaryHash -or $_.metadata.ownerReferences.name -eq 'gateway' } |
+        Where-Object { $_.metadata.labels.'rollouts-pod-template-hash' -eq $canaryHash } |
         Sort-Object { $_.metadata.creationTimestamp })
     $latest = $runs | Select-Object -Last 1
     if ($latest -and $latest.status.phase -in @('Successful', 'Failed', 'Error', 'Inconclusive')) {
