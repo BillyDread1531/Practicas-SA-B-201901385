@@ -37,6 +37,19 @@ Mark 'canary-metricas: activando CANARY_FAULT_INJECTION=true en el gateway'
 $tStart = Get-Stamp
 Invoke-Native kubectl -n argocd annotate application sa-platform-dev argocd.argoproj.io/refresh=hard --overwrite | Out-Null
 
+# El trafico se lanza YA, en paralelo con la espera de la revision canary
+# (no despues): el AnalysisRun arranca su primera medicion de 15s en cuanto
+# Argo Rollouts entra al paso "analysis", que ocurre casi al mismo tiempo
+# que currentPodHash cambia. Si se espera a detectar la revision ANTES de
+# lanzar el trafico, el arranque del Pod de trafico (scheduling + pull +
+# register/login) se come 1-2 de las 5 mediciones y el AnalysisRun termina
+# Inconclusive en vez de Failed.
+Mark 'canary-metricas: generando trafico continuo (arranca ya, en paralelo con la deteccion de la revision)'
+$trafficJob = Start-Job -ScriptBlock {
+    param($scriptPath, $ns)
+    & $scriptPath -DurationSeconds 300 -RequestsPerSecond 5 -Namespace $ns -InCluster
+} -ArgumentList (Join-Path $PSScriptRoot 'generar-trafico.ps1'), $Namespace
+
 Mark 'canary-metricas: esperando que Argo Rollouts cree la revision canary'
 $canaryHash = $null
 Wait-Until -What 'nueva revision canary' -TimeoutSeconds 180 -IntervalSeconds 5 -Condition {
@@ -47,12 +60,6 @@ Wait-Until -What 'nueva revision canary' -TimeoutSeconds 180 -IntervalSeconds 5 
 }
 Mark "canary-metricas: revision canary = $canaryHash"
 
-Mark 'canary-metricas: generando trafico continuo durante el rollout'
-$trafficJob = Start-Job -ScriptBlock {
-    param($scriptPath, $ns)
-    & $scriptPath -DurationSeconds 240 -RequestsPerSecond 5 -Namespace $ns -InCluster
-} -ArgumentList (Join-Path $PSScriptRoot 'generar-trafico.ps1'), $Namespace
-
 Mark 'canary-metricas: esperando el resultado del AnalysisRun (debe fallar por metricas del canary)'
 $analysisRun = $null
 $outcome = $null
@@ -61,7 +68,7 @@ Wait-Until -What 'AnalysisRun concluido' -TimeoutSeconds ($TimeoutMinutes * 60) 
         Where-Object { $_.metadata.labels.'rollout-pod-template-hash' -eq $canaryHash -or $_.metadata.ownerReferences.name -eq 'gateway' } |
         Sort-Object { $_.metadata.creationTimestamp })
     $latest = $runs | Select-Object -Last 1
-    if ($latest -and $latest.status.phase -in @('Successful', 'Failed', 'Error')) {
+    if ($latest -and $latest.status.phase -in @('Successful', 'Failed', 'Error', 'Inconclusive')) {
         $script:analysisRun = $latest.metadata.name
         $script:outcome = $latest.status.phase
         $true
@@ -79,7 +86,7 @@ $tAborted = Get-Stamp
 $rolloutAfter = Get-Kube -n $Namespace get rollout gateway -o json | ConvertFrom-Json
 Mark "canary-metricas: Rollout abortado a las $tAborted (phase=$($rolloutAfter.status.phase), abort=$($rolloutAfter.status.abort))"
 
-Wait-Job $trafficJob -Timeout 260 | Out-Null
+Wait-Job $trafficJob -Timeout 320 | Out-Null
 $trafficOut = Receive-Job $trafficJob
 Remove-Job $trafficJob -Force
 
@@ -141,4 +148,4 @@ $log
 "@
 Set-Content -Path $EvidenceFile -Value $md -Encoding UTF8
 Mark "canary-metricas: evidencia escrita en $EvidenceFile"
-if ($outcome -eq 'Successful') { throw "El AnalysisRun NO fallo (outcome=$outcome): revisar el fallo inducido o los umbrales" }
+if ($outcome -ne 'Failed' -and $outcome -ne 'Error') { throw "El AnalysisRun no fallo por las metricas esperadas (outcome=$outcome): revisar el fallo inducido, los umbrales o el trafico" }
