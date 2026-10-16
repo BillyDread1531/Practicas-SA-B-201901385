@@ -26,6 +26,12 @@ spec:
       interval: 15s
       count: 5
       failureLimit: 1
+      # El pod canary recien creado puede tardar unos segundos en recibir su
+      # primera conexion real (el Service de Kubernetes reparte por conexion,
+      # no por peticion), asi que las primeras 1-2 mediciones pueden salir
+      # NaN (sin datos todavia) y no deben tumbar todo el analisis como
+      # "Inconclusive": se tolera hasta 3 de las 5.
+      inconclusiveLimit: 3
       # Exito si el error rate del canary es menor al 10%. El fallo inducido
       # (CANARY_FAULT_INJECTION) produce ~50%, muy por encima del umbral.
       successCondition: result < 0.10
@@ -45,6 +51,7 @@ spec:
       interval: 15s
       count: 5
       failureLimit: 1
+      inconclusiveLimit: 3
       # Exito si el p95 del canary es menor a 1 segundo. El fallo inducido
       # agrega 2000ms fijos, muy por encima del umbral.
       successCondition: result < 1
