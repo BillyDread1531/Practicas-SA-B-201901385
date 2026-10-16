@@ -45,9 +45,9 @@ spec:
           timeout: 10
           query: |
             scalar(
-              sum(rate(http_requests_total{service="gateway", rollouts_pod_template_hash="{{"{{args.canary-hash}}"}}", status_code=~"5.."}[2m]))
+              (sum(rate(http_requests_total{service="gateway", rollouts_pod_template_hash="{{"{{args.canary-hash}}"}}", status_code=~"5.."}[2m])) or vector(0))
               /
-              sum(rate(http_requests_total{service="gateway", rollouts_pod_template_hash="{{"{{args.canary-hash}}"}}"}[2m]))
+              (sum(rate(http_requests_total{service="gateway", rollouts_pod_template_hash="{{"{{args.canary-hash}}"}}"}[2m])) + 0.001)
             )
 
     - name: latencia-p95
