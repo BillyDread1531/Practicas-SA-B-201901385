@@ -17,9 +17,8 @@ métricas reales.
 | **SLO declarados** | Disponibilidad gateway: 99% sin 5xx (ventana 1h) · Latencia gateway: p95 < 500ms (ventana 1h). Ver [`informe-operacion.md`](informe-operacion.md) §1 |
 | **Reglas de alerta** | [`P8-GitOps/apps/prometheus.yaml`](https://github.com/BillyDread1531/Practica-SA-P8-GitOps/blob/p10/apps/prometheus.yaml) (`serverFiles.alerting_rules.yml`) |
 | **Tablero** | [`P10/dashboards/operacion.json`](dashboards/operacion.json) |
-| **Reversión por métricas** | [PENDIENTE: nombre real del AnalysisRun] — Rollout `gateway`. Ver [`evidencias/canary-metricas.md`](evidencias/canary-metricas.md) |
-| **Recorrido síntoma a causa** | [`evidencias/sintoma-a-causa.md`](evidencias/sintoma-a-causa.md) — tiempo medido: [PENDIENTE] |
-| **Video demostrativo** | [PENDIENTE] |
+| **Reversión por métricas** | `gateway-769d6d65bd-22-1` → **Failed** (tasa de error 17.8%, p95 2.34s; falló 71s después de activar el fallo). Rollout `gateway` abortado solo (`Degraded`, `abort=true`). Ver [`evidencias/canary-metricas.md`](evidencias/canary-metricas.md) |
+| **Recorrido síntoma a causa** | [`evidencias/sintoma-a-causa.md`](evidencias/sintoma-a-causa.md) — tiempo medido: detección 95s, causa confirmada 102s (1.7 min, bajo el objetivo de 3 min) |
 
 ## Documentos
 
@@ -51,7 +50,7 @@ métricas reales.
 
 ```
 P10/
-├── terraform/      AKS de 1 nodo (Standard_B2ms), sin ACR, sin LoadBalancer, estado local
+├── terraform/      AKS de 1 nodo (Standard_D2s_v7), sin ACR, sin LoadBalancer, estado local
 ├── scripts/        bootstrap.ps1 (entrada única), teardown.ps1, verificar.ps1,
 │                   prueba-sintoma-causa.ps1, prueba-canary-metricas.ps1, generar-trafico.ps1
 ├── dashboards/      operacion.json (tablero exportado)
@@ -63,8 +62,10 @@ P10/
 
 ## Costo y ciclo de uso
 
-Este clúster se diseñó para costar lo mínimo posible: 1 nodo `Standard_B2ms` (~US$0.08/hora), sin Load Balancer, sin
-IP pública (acceso vía `kubectl port-forward`), sin Azure Container Registry (imágenes en ghcr.io, gratuito). Se
+Este clúster se diseñó para costar lo mínimo posible: 1 nodo `Standard_D2s_v7` (el SKU económico
+disponible en la región/cuota de esta suscripción; `Standard_B2ms`/`B2s_v2` no tenían cupo), sin
+Load Balancer ni IP pública (acceso vía `kubectl port-forward`), sin Azure Container Registry
+(imágenes en ghcr.io, gratuito). Se
 construye para trabajar, se apaga con `scripts/teardown.ps1` al terminar la sesión, y se reconstruye con
 `scripts/bootstrap.ps1` (~10-15 min) la próxima vez.
 

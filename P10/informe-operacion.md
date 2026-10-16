@@ -1,6 +1,6 @@
 # Informe de operación — Práctica 10
 
-**Sistema:** plataforma de microservicios en AKS `aks-sa-p10` (namespace `sa-p8`) · **Fecha:** [PENDIENTE: fecha de la prueba]
+**Sistema:** plataforma de microservicios en AKS `aks-sa-p10` (namespace `sa-p8`) · **Fecha:** 2026-10-16
 
 ## 1. SLO declarados
 
@@ -28,36 +28,33 @@ canario) en lugar de perderse en el siguiente reconciliado de ArgoCD.
 
 ## 3. Tiempo de detección
 
-[PENDIENTE: completar con `P10/evidencias/sintoma-a-causa.md` tras ejecutar `P10/scripts/prueba-sintoma-causa.ps1`]
+Medido con `P10/scripts/prueba-sintoma-causa.ps1` (evidencia completa: `P10/evidencias/sintoma-a-causa.md`).
 
 | Marca | Hora (UTC) |
 |---|---|
-| T0 — fallo activado | [PENDIENTE] |
-| T1 — primera señal (alerta `TasaErrorAuthServiceElevada` firing) | [PENDIENTE] |
-| **Tiempo de detección (T1 − T0)** | **[PENDIENTE] s** |
+| T0 — fallo activado (`FAULT_INJECTION=true` en `auth-service`, publicado y sincronizado por ArgoCD) | 2026-10-16T03:40:52Z |
+| T1 — primera señal (alerta `TasaErrorAuthServiceElevada` en estado *firing*) | 2026-10-16T03:42:27Z |
+| **Tiempo de detección (T1 − T0)** | **95 s** |
 
 ## 4. Recorrido hasta la causa
 
-[PENDIENTE: completar con la misma evidencia]
-
 Pasos exactos seguidos (automatizados por el script, reproducibles a mano con el mismo orden):
 
-1. Alerta `TasaErrorAuthServiceElevada` en estado *firing* (Alertmanager/Prometheus).
+1. Alerta `TasaErrorAuthServiceElevada` en estado *firing* (Alertmanager/Prometheus) — detectada a las 03:42:27Z.
 2. Desde el tablero de Grafana, panel de errores por servicio → confirmar que es específicamente `auth-service`.
-3. Explore → datasource Tempo → `{ resource.service.name="auth-service" && status=error }` → una traza con error.
-4. Desde esa traza, abrir sus registros en Loki (enlace automático `trace_id`) → confirmar el mensaje
-   `"fallo inducido (FAULT_INJECTION) en /auth/login"`.
+3. Explore → datasource Tempo → `{ resource.service.name="auth-service" && status=error }` → traza con error
+   encontrada (`trace_id=8684dc64a4c1dd00624876804f4cb113`) a las 03:42:31Z.
+4. Desde esa traza, abrir sus registros en Loki (enlace automático `trace_id`) → confirmado el mensaje
+   `"fallo inducido (FAULT_INJECTION) en /auth/login"` a las 03:42:34Z.
 
-**Tiempo total (T2 − T0): [PENDIENTE] s ([PENDIENTE] min).** Objetivo de la rúbrica: menos de 3 minutos.
+**Tiempo total (T2 − T0): 102 s (1.7 min).** Objetivo de la rúbrica: menos de 3 minutos — **cumplido**.
 
 ## 5. Tiempo de recuperación
 
-[PENDIENTE: completar con la misma evidencia]
-
 | Fallo | Quién/qué lo resolvió | Tiempo (T_fin − T0) |
 |---|---|---|
-| `FAULT_INJECTION` en auth-service | Un operador revierte el flag vía GitOps (`set-gitops-flag.ps1 -Value false`) | [PENDIENTE] s |
-| `CANARY_FAULT_INJECTION` en gateway | **Argo Rollouts, automáticamente** (AnalysisRun `Failed` → abort) — ver `P10/evidencias/canary-metricas.md` | [PENDIENTE] s |
+| `FAULT_INJECTION` en auth-service | Un operador revierte el flag vía GitOps (`set-gitops-flag.ps1 -Value false`); alerta resuelta a las 03:45:05Z | 253 s |
+| `CANARY_FAULT_INJECTION` en gateway | **Argo Rollouts, automáticamente** (AnalysisRun `gateway-769d6d65bd-22-1` → `Failed` → Rollout `Degraded`/`abort=true`, sin intervención humana) — ver `P10/evidencias/canary-metricas.md` | 74 s |
 
 ## 6. Alerta faltante o sobrante
 
