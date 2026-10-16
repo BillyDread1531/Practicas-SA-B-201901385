@@ -43,6 +43,15 @@ etiquetas de métrica (`action: labelmap` en el scrape config). Si alguien simpl
 estable sin que nadie lo note hasta el primer despliegue fallido — un canario roto que "siempre se promueve" es
 peor que no tener canario, porque da una falsa sensación de seguridad.
 
+Esto no es solo hipotético: durante las pruebas de esta práctica, `valueFrom.podTemplateHashValue: Canary` (un
+valor que no existe en el enum real de Argo Rollouts — los válidos son `Stable`/`Latest`) resolvió en silencio a
+una cadena vacía en **cada** `AnalysisRun` creado, así que la consulta terminaba filtrando por
+`rollouts_pod_template_hash=""` y nunca encontraba series. El síntoma visible no era un error de validación (el
+CRD no lo rechaza) sino `AnalysisRun`s que siempre concluían `Inconclusive` con todas las mediciones en `NaN`,
+indistinguible a primera vista de "el canario todavía no recibió tráfico". Se diagnosticó solo inspeccionando
+`analysisrun.spec.args` directamente y comparando con una consulta manual idéntica que sí traía datos reales — la
+misma clase de fallo silencioso descrita arriba, solo que en el argumento en vez de en el scrape config.
+
 **7. ¿Por qué el runbook de `TasaErrorAuthServiceElevada` dice "requiere un paso manual adicional" en los límites?**
 Porque la alerta no distingue si el 5xx vino del código de `auth-service` o de una dependencia caída (PostgreSQL).
 Reconocer ese límite es más honesto que pretender que una sola métrica agregada basta para diagnosticar cualquier
@@ -62,5 +71,8 @@ funciona), pero en producción debería evaluarse contra una ventana más larga 
 El `AnalysisTemplate` y las alertas dependen de que el nodo único del clúster (restricción de costo, no de diseño)
 no esté saturado: si el nodo entero se queda sin CPU, TODAS las métricas (incluidas las del canario estable) se
 degradan a la vez, y el `AnalysisTemplate` podría fallar por una causa que no tiene nada que ver con la versión
-candidata. Esto no se resolvió en esta práctica por la restricción de presupuesto (1 nodo `Standard_B2ms`); con más
-cuota, la mitigación sería un segundo nodo y límites de recursos más estrictos por pod.
+candidata. Esto no se resolvió en esta práctica por la restricción de presupuesto (1 nodo `Standard_D2s_v7`); con más
+cuota, la mitigación sería un segundo nodo y límites de recursos más estrictos por pod. En la práctica, esta
+contención real fue la causa de que el pod canario tardara hasta ~110s en recibir su primer scrape exitoso de
+Prometheus bajo carga — el motivo por el que `inconclusiveLimit` se amplió a 9 de 12 mediciones (240s de ventana)
+en vez de dejarlo en un valor más estricto.
