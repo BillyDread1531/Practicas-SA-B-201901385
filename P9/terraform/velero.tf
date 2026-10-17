@@ -98,7 +98,13 @@ resource "helm_release" "velero" {
         schedule = var.velero_schedule
         template = {
           ttl                      = var.velero_retention
-          includedNamespaces       = ["sa-p8"]
+          # kube-system se incluye para que el respaldo tambien cubra el
+          # Secret con la llave activa de Sealed Secrets (continuidad de
+          # secretos por una segunda vía, redundante con el respaldo en
+          # Azure Key Vault). restore-datos.ps1 nunca restaura kube-system:
+          # su Restore siempre fija includedNamespaces al namespace de la
+          # app, asi que esto no agrega riesgo de sobrescribir el cluster.
+          includedNamespaces       = ["sa-p8", "kube-system"]
           includeClusterResources  = true
           snapshotVolumes          = false
           defaultVolumesToFsBackup = true
